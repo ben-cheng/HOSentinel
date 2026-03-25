@@ -22,6 +22,7 @@ errorOnDuplicatesPkgDeps(devDependencies, dependencies);
  */
 export default defineConfig(({ command, mode }): UserConfig => {
   return {
+    base: "/HOSentinel/",
     plugins: [
       tailwindcss(),
       qwikCity(),
