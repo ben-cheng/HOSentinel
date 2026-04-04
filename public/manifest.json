@@ -5,5 +5,5 @@
   "start_url": ".",
   "display": "standalone",
   "background_color": "#fff",
-  "description": "A Qwik project app."
+  "description": "Hours of Service (HOS) tracking and management tool for Commercial Drivers."
 }
