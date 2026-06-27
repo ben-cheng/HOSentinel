@@ -1,4 +1,4 @@
-import { component$, useSignal, $ } from "@builder.io/qwik";
+import { component$, useSignal, $, useTask$ } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import { parseLogs } from "~/libs/hos-log-normalizer";
 import { DutyEntry } from "~/models/duty-entry";
@@ -23,6 +23,17 @@ export default component$(() => {
       result.value = [];
       error.value = e.message || "Failed to parse logs";
     }
+  });
+
+  useTask$(({ track, cleanup }) => {
+    track(() => input.value);
+    const id = setTimeout(() => {
+      handleParse();
+    }, 500);
+    cleanup(() => {
+      clearTimeout(id);
+      // Cleanup logic if needed
+    });
   });
 
   return (
@@ -56,15 +67,7 @@ export default component$(() => {
           />
         </div>
 
-        {/* Button */}
-        <div class="flex justify-between items-center">
-          <button
-            onClick$={handleParse}
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            Parse Logs
-          </button>
-
+        <div class="flex justify-between items-center min-h-[1.5rem]">
           {error.value && (
             <span class="text-sm text-red-500">{error.value}</span>
           )}
@@ -102,24 +105,7 @@ export default component$(() => {
               })}
             </div>
           </div>
-
-          <div class="bg-gray-900 text-green-400 text-sm rounded-lg p-4 overflow-auto max-h-64">
-            <pre>
-              {result.value.length
-                ? JSON.stringify(result.value, null, 2)
-                : "// No data"}
-            </pre>
-          </div>
-
-          <div class="bg-gray-900 text-green-400 text-sm rounded-lg p-4 overflow-auto max-h-64">
-            <pre>
-              {calculatedDuration.value
-                ? JSON.stringify(calculatedDuration.value, null, 2)
-                : "// No data"}
-            </pre>
-          </div>
         </div>
-
       </div>
     </div>
   );
