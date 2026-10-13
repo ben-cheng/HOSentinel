@@ -113,8 +113,6 @@ export function parseLogs(input: string): ParseResult {
     });
   }
 
-  console.log("Calculated Duration:", duration);
-
   return {
     value: result,
     duration: duration,

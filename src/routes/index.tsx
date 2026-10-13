@@ -10,6 +10,15 @@ export default component$(() => {
   const calculatedDuration = useSignal<StatusDuration>(createEmptyStatusDuration());
   const error = useSignal<string | null>(null);
 
+  const addStatusEntry = $((status: "O" | "D" | "N") => {
+    const time = window.prompt("Enter the end time (e.g. 09:34 or 934):");
+
+    if (time === null || !time.trim()) return;
+
+    const separator = input.value.trim() ? "\n" : "";
+    input.value = `${input.value.trimEnd()}${separator}${time.trim()} ${status}`;
+  });
+
   const handleParse = $(() => {
     error.value = null;
 
@@ -65,6 +74,30 @@ export default component$(() => {
               (input.value = (e.target as HTMLTextAreaElement).value)
             }
           />
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
+            onClick$={() => addStatusEntry("O")}
+          >
+            Off-duty
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            onClick$={() => addStatusEntry("D")}
+          >
+            Driving
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+            onClick$={() => addStatusEntry("N")}
+          >
+            On-duty not driving
+          </button>
         </div>
 
         <div class="flex justify-between items-center min-h-[1.5rem]">
