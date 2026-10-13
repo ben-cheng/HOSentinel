@@ -13,12 +13,18 @@ import {
 } from "~/libs/hos-log-normalizer";
 import {
   getHosLog,
-  HosLogRecord,
   listHosLogs,
   saveHosLog,
 } from "~/libs/hos-log-storage";
+import type { HosLogRecord } from "~/libs/hos-log-storage";
 import { DutyEntry } from "~/models/duty-entry";
-import { createEmptyStatusDuration, isStatusKey, STATUS_LABEL, STATUS_MAP, StatusDuration } from "~/models/duty-status";
+import {
+  createEmptyStatusDuration,
+  isStatusKey,
+  StatusDuration,
+} from "~/models/duty-status";
+import { HistoryDrawer } from "~/components/hos-log/history-drawer";
+import { TodayLogPanel } from "~/components/hos-log/today-log-panel";
 
 function getLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -388,326 +394,45 @@ export default component$(() => {
 
   return (
     <div class="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
-      <div
-        class="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-6 space-y-6"
-        aria-hidden={historyOpen.value}
-        inert={historyOpen.value}
-      >
-        
-        {/* Title */}
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">
-            HOS Log Parser
-          </h1>
-          <p class="text-sm text-gray-500">
-            Enter status changes. A timestamp followed by a status starts that status at the given time; spaces are ignored. The day defaults to Off-duty (O).
-          </p>
-        </div>
-
-        <section class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
-          <div>
-            <h2 class="text-sm font-semibold text-gray-700">Today</h2>
-            <p class="text-sm text-gray-500">
-              {new Date(`${selectedDate.value}T00:00:00`).toLocaleDateString()}
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            {loadedRecord.value && input.value !== loadedRecord.value.logText && (
-              <span class="text-sm font-medium text-amber-700">Unsaved changes</span>
-            )}
-            <button
-              type="button"
-              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!storageReady.value || isLoadingDay.value || isSaving.value}
-              onClick$={openHistory}
-            >
-              View past logs
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!storageReady.value || !selectedDate.value || isLoadingDay.value || isSaving.value}
-              onClick$={saveCurrentDay}
-            >
-              {isSaving.value ? "Saving..." : "Save today"}
-            </button>
-          </div>
-          {storageError.value && (
-            <p role="alert" class="w-full text-sm text-red-600">
-              Local storage error: {storageError.value}
-            </p>
-          )}
-          {storageMessage.value && (
-            <p role="status" class="w-full text-sm text-green-700">
-              {storageMessage.value}
-            </p>
-          )}
-        </section>
-
-        <div>
-          <label
-            for="hos-log"
-            class="mb-2 block text-sm font-semibold text-gray-700"
-          >
-            Daily HOS log
-          </label>
-          <textarea
-            id="hos-log"
-            class="w-full h-48 p-3 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={!storageReady.value || isLoadingDay.value || isSaving.value}
-            value={input.value}
-            onInput$={(e) =>
-              (input.value = (e.target as HTMLTextAreaElement).value)
-            }
-          />
-        </div>
-
-        {!historyOpen.value && (
-          <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
-              disabled={!storageReady.value || isLoadingDay.value || isSaving.value}
-              onClick$={() => addStatusEntry("O")}
-            >
-              Off-duty
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              disabled={!storageReady.value || isLoadingDay.value || isSaving.value}
-              onClick$={() => addStatusEntry("D")}
-            >
-              Driving
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
-              disabled={!storageReady.value || isLoadingDay.value || isSaving.value}
-              onClick$={() => addStatusEntry("N")}
-            >
-              On-duty not driving
-            </button>
-          </div>
-        )}
-
-        <div class="flex justify-between items-center min-h-6">
-          {error.value && (
-            <span class="text-sm text-red-500">{error.value}</span>
-          )}
-        </div>
-
-        {/* Result */}
-        <div>
-          <h2 class="text-lg font-semibold text-gray-700 mb-2">
-            Parsed Output
-          </h2>
-
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-            <h3 class="text-sm font-semibold text-blue-700">
-              Duration Breakdown
-            </h3>
-
-            <div class="space-y-2">
-              {Object.entries(calculatedDuration.value).map(([key, minutes]) => {
-                const hours = Number((minutes / 60).toFixed(2));
-
-                return (
-                  <div
-                    key={key}
-                    class="flex justify-between items-center text-sm"
-                  >
-                    <span class="text-gray-700">
-                      {STATUS_LABEL[key as keyof typeof STATUS_MAP]}
-                    </span>
-
-                    <span class="font-semibold text-blue-800">
-                      {hours} h
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+      <TodayLogPanel
+        date={selectedDate.value}
+        input={input.value}
+        calculatedDuration={calculatedDuration.value}
+        error={error.value}
+        storageError={storageError.value}
+        storageMessage={storageMessage.value}
+        loadedRecord={loadedRecord.value}
+        historyOpen={historyOpen.value}
+        storageReady={storageReady.value}
+        isLoadingDay={isLoadingDay.value}
+        isSaving={isSaving.value}
+        onOpenHistory={openHistory}
+        onSaveCurrentDay={saveCurrentDay}
+        onInput={$((event: Event) => {
+          input.value = (event.target as HTMLTextAreaElement).value;
+        })}
+        onAddStatus={addStatusEntry}
+      />
 
       {historyOpen.value && (
-        <div class="fixed inset-0 z-50 flex justify-end">
-          <button
-            type="button"
-            class="absolute inset-0 bg-black/20"
-            aria-label="Discard historical changes and close"
-            onClick$={discardHistoricalChanges}
-          />
-          <aside
-            class="relative flex h-full w-full max-w-xl animate-[history-slide-in_250ms_ease-out] flex-col bg-white shadow-2xl"
-            aria-label="Historical HOS log"
-          >
-            <header class="flex items-start justify-between gap-4 border-b border-gray-200 p-5">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                  Historical record
-                </p>
-                <h2 class="mt-1 text-xl font-bold text-gray-800">
-                  {historyDate.value
-                    ? new Date(`${historyDate.value}T00:00:00`).toLocaleDateString()
-                    : "Select a day"}
-                </h2>
-                {historyInput.value !== historyBaseline.value && (
-                  <p class="mt-1 text-sm font-medium text-amber-700">
-                    Unsaved changes
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                class="rounded-lg p-2 text-2xl leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                aria-label="Discard changes and close"
-                onClick$={discardHistoricalChanges}
-              >
-                &times;
-              </button>
-            </header>
-
-            <div class="flex-1 space-y-5 overflow-y-auto p-5">
-              <label class="flex max-w-xs flex-col gap-1 text-sm font-medium text-gray-700">
-                Select historical day
-                <input
-                  type="date"
-                  max={getPreviousLocalDateKey(getLocalDateKey(new Date()))}
-                  class="rounded-lg border border-gray-300 px-3 py-2"
-                  value={historyDate.value}
-                  disabled={isHistoryLoading.value || isHistorySaving.value}
-                  onInput$={(event) => {
-                    const date = (event.target as HTMLInputElement).value;
-                    if (date) openHistoricalDay(date);
-                  }}
-                />
-              </label>
-
-              <div>
-                <h3 class="mb-2 text-sm font-semibold text-gray-700">
-                  Saved historical days
-                </h3>
-                {savedLogs.value.some(
-                  (record) => record.date < getLocalDateKey(new Date()),
-                ) ? (
-                  <div class="flex flex-wrap gap-2">
-                    {savedLogs.value
-                      .filter(
-                        (record) => record.date < getLocalDateKey(new Date()),
-                      )
-                      .map((record) => (
-                        <button
-                          key={record.date}
-                          type="button"
-                          disabled={
-                            isHistoryLoading.value || isHistorySaving.value
-                          }
-                          class={`rounded-full border px-3 py-1 text-sm ${
-                            historyDate.value === record.date
-                              ? "border-blue-700 bg-blue-50 text-blue-800"
-                              : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                          }`}
-                          onClick$={() => openHistoricalDay(record.date)}
-                        >
-                          {new Date(
-                            `${record.date}T00:00:00`,
-                          ).toLocaleDateString()}
-                        </button>
-                      ))}
-                  </div>
-                ) : (
-                  <p class="text-sm text-gray-500">
-                    No saved historical logs yet.
-                  </p>
-                )}
-              </div>
-
-              {historyStorageError.value && (
-                <p role="alert" class="text-sm text-red-600">
-                  Local storage error: {historyStorageError.value}
-                </p>
-              )}
-
-              <div>
-                <label
-                  for="historical-hos-log"
-                  class="mb-2 block text-sm font-semibold text-gray-700"
-                >
-                  Daily HOS log
-                </label>
-                <textarea
-                  id="historical-hos-log"
-                  class="h-48 w-full rounded-lg border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                  disabled={
-                    isHistoryLoading.value || isHistorySaving.value
-                  }
-                  value={historyInput.value}
-                  onInput$={(event) =>
-                    (historyInput.value = (
-                      event.target as HTMLTextAreaElement
-                    ).value)
-                  }
-                />
-                {historyError.value && (
-                  <p role="alert" class="mt-2 text-sm text-red-600">
-                    {historyError.value}
-                  </p>
-                )}
-              </div>
-
-              <section class="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <h3 class="mb-3 text-sm font-semibold text-blue-700">
-                  Duration Breakdown
-                </h3>
-                <div class="space-y-2">
-                  {Object.entries(historyDuration.value).map(
-                    ([key, minutes]) => (
-                      <div
-                        key={key}
-                        class="flex justify-between text-sm"
-                      >
-                        <span class="text-gray-700">
-                          {STATUS_LABEL[key as keyof typeof STATUS_MAP]}
-                        </span>
-                        <span class="font-semibold text-blue-800">
-                          {Number((minutes / 60).toFixed(2))} h
-                        </span>
-                      </div>
-                    ),
-                  )}
-                </div>
-              </section>
-            </div>
-
-            <footer class="flex justify-end gap-3 border-t border-gray-200 p-5">
-              <button
-                type="button"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                disabled={isHistoryLoading.value || isHistorySaving.value}
-                onClick$={discardHistoricalChanges}
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={
-                  isHistoryLoading.value ||
-                  isHistorySaving.value ||
-                  !historyDate.value ||
-                  Boolean(historyError.value) ||
-                  historyInput.value === historyBaseline.value
-                }
-                onClick$={saveHistoricalDay}
-              >
-                {isHistorySaving.value ? "Saving..." : "Save changes"}
-              </button>
-            </footer>
-          </aside>
-        </div>
+        <HistoryDrawer
+          date={historyDate.value}
+          today={getPreviousLocalDateKey(getLocalDateKey(new Date()))}
+          input={historyInput.value}
+          baseline={historyBaseline.value}
+          duration={historyDuration.value}
+          error={historyError.value}
+          storageError={historyStorageError.value}
+          savedLogs={savedLogs.value}
+          isLoading={isHistoryLoading.value}
+          isSaving={isHistorySaving.value}
+          onSelectDay={openHistoricalDay}
+          onInput={$((event: Event) => {
+            historyInput.value = (event.target as HTMLTextAreaElement).value;
+          })}
+          onDiscard={discardHistoricalChanges}
+          onSave={saveHistoricalDay}
+        />
       )}
     </div>
   );
