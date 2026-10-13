@@ -11,12 +11,12 @@ export default component$(() => {
   const error = useSignal<string | null>(null);
 
   const addStatusEntry = $((status: "O" | "D" | "N") => {
-    const time = window.prompt("Enter the end time (e.g. 09:34 or 934):");
+    const time = window.prompt("Enter the end time for this status (e.g. 09:34 or 934):");
 
     if (time === null || !time.trim()) return;
 
     const separator = input.value.trim() ? "\n" : "";
-    input.value = `${input.value.trimEnd()}${separator}${time.trim()} ${status}`;
+    input.value = `${input.value.trimEnd()}${separator}${status}${time.trim()}`;
   });
 
   const handleParse = $(() => {
@@ -55,7 +55,7 @@ export default component$(() => {
             HOS Log Parser
           </h1>
           <p class="text-sm text-gray-500">
-            Enter your shift logs (time = end of status)
+            Enter status and interval end time. The day defaults to Off-duty (O); a status without a time sets the all-day default.
           </p>
         </div>
 
@@ -63,12 +63,12 @@ export default component$(() => {
         <div>
           <textarea
             class="w-full h-48 p-3 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={`Flexible format supported:
+            placeholder={`Enter one status change per line:
 
-09:34 O
-934 N
-9:34D
-093OO`}
+O0630
+N645
+D900
+O`}
             value={input.value}
             onInput$={(e) =>
               (input.value = (e.target as HTMLTextAreaElement).value)
@@ -100,7 +100,7 @@ export default component$(() => {
           </button>
         </div>
 
-        <div class="flex justify-between items-center min-h-[1.5rem]">
+        <div class="flex justify-between items-center min-h-6">
           {error.value && (
             <span class="text-sm text-red-500">{error.value}</span>
           )}

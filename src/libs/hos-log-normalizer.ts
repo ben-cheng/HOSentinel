@@ -34,33 +34,40 @@ function toMinutes(time: string): number {
   return h * 60 + m;
 }
 
-// 🔹 Extract time + status from messy input
-function parseLine(line: string): { time: string; status: StatusKey } {
+function parseLine(line: string): { time: string | null; status: StatusKey } {
   const cleaned = line.replace(/\s+/g, "");
+  const statusOnlyMatch = cleaned.match(/^([A-Za-z]+)$/);
 
-  // Match: time + status (e.g. 0934O, 9:34D, etc.)
-  const match = cleaned.match(/^(\d{1,2}:?\d{2})([A-Za-z]+)$/);
+  if (statusOnlyMatch) {
+    const status = statusOnlyMatch[1].toUpperCase();
+
+    if (!isStatusKey(status)) {
+      throw new Error(`Invalid status: "${line}"`);
+    }
+
+    return { time: null, status };
+  }
+
+  const match = cleaned.match(/^([A-Za-z]+)(\d{1,2}:?\d{2})$/);
 
   if (!match) {
     throw new Error(`Invalid format: "${line}"`);
   }
 
-  const [, rawTime, rawStatus] = match;
+  const [, rawStatus, rawTime] = match;
+  const status = rawStatus.toUpperCase();
 
-  const time = normalizeTime(rawTime);
-  const minutes = toMinutes(time);
-
-  if (minutes > 1440) {
-    throw new Error(`Time exceeds 24:00: "${line}"`);
-  }
-
-  const statusKey = rawStatus.toUpperCase();
-
-  if (!(isStatusKey(statusKey))) {
+  if (!isStatusKey(status)) {
     throw new Error(`Invalid status: "${line}"`);
   }
 
-  return { time, status: statusKey };
+  const time = normalizeTime(rawTime);
+
+  if (toMinutes(time) > 1440) {
+    throw new Error(`Time exceeds 24:00: "${line}"`);
+  }
+
+  return { time, status };
 }
 
 export type ParseResult = {
@@ -76,14 +83,22 @@ export function parseLogs(input: string): ParseResult {
   const result: DutyEntry[] = [];
   const duration = createEmptyStatusDuration();
 
+  const parsedLines = lines
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({ ...parseLine(line), line }));
+  const allDayEntries = parsedLines.filter(({ time }) => time === null);
+
+  if (allDayEntries.length > 1) {
+    throw new Error("Only one status-only, all-day entry is allowed.");
+  }
+
   let prevTime = "00:00";
   let prevMinutes = 0;
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) continue;
+  for (const { time, status, line } of parsedLines) {
+    if (time === null) continue;
 
-    const { time, status } = parseLine(line);
     const currentMinutes = toMinutes(time);
 
     if (currentMinutes <= prevMinutes) {
@@ -104,12 +119,13 @@ export function parseLogs(input: string): ParseResult {
 
   // Fill to 24:00
   if (prevMinutes < 1440) {
-    duration['O'] += 1440 - prevMinutes;
+    const finalStatus = allDayEntries[0]?.status ?? "O";
+    duration[finalStatus] += 1440 - prevMinutes;
 
     result.push({
       startTime: prevTime,
       endTime: "24:00",
-      status: "OFF_DUTY",
+      status: STATUS_MAP[finalStatus],
     });
   }
 
