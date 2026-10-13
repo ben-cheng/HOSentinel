@@ -2,21 +2,60 @@ import { component$, useSignal, $, useTask$ } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import { parseLogs } from "~/libs/hos-log-normalizer";
 import { DutyEntry } from "~/models/duty-entry";
-import { createEmptyStatusDuration, STATUS_LABEL, STATUS_MAP, StatusDuration } from "~/models/duty-status";
+import { createEmptyStatusDuration, isStatusKey, STATUS_LABEL, STATUS_MAP, StatusDuration } from "~/models/duty-status";
 
 export default component$(() => {
-  const input = useSignal("");
+  const input = useSignal("O");
   const result = useSignal<DutyEntry[]>([]);
   const calculatedDuration = useSignal<StatusDuration>(createEmptyStatusDuration());
   const error = useSignal<string | null>(null);
 
   const addStatusEntry = $((status: "O" | "D" | "N") => {
-    const time = window.prompt("Enter the end time for this status (e.g. 09:34 or 934):");
+    const lines = input.value.split("\n");
+    let previousLineIndex = lines.length - 1;
+    while (previousLineIndex >= 0 && !lines[previousLineIndex].trim()) {
+      previousLineIndex--;
+    }
+    const previousLine = lines[previousLineIndex]?.replace(/\s+/g, "");
 
-    if (time === null || !time.trim()) return;
+    if (previousLine?.length === 1 && previousLine.toUpperCase() === status) {
+      return;
+    }
+
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const transitionEntry = previousLine?.match(/^(\d{1,2}:?\d{2})([A-Za-z])$/);
+    const intervalEndEntry = previousLine?.match(/^([A-Za-z])(\d{1,2}:?\d{2})$/);
+    const previousStatus = transitionEntry?.[2] ?? intervalEndEntry?.[1];
+    const previousTimeRaw = transitionEntry?.[1] ?? intervalEndEntry?.[2];
+    const previousTimeFirst = Boolean(transitionEntry);
+
+    if (
+      previousStatus &&
+      previousTimeRaw &&
+      isStatusKey(previousStatus.toUpperCase())
+    ) {
+      const previousTime = previousTimeRaw.replace(":", "").padStart(4, "0");
+
+      if (previousTime === time) {
+        lines[previousLineIndex] = previousTimeFirst
+          ? `${previousTimeRaw}${status}`
+          : `${status}${previousTimeRaw}`;
+        input.value = lines.join("\n");
+        return;
+      }
+
+      if (previousStatus.toUpperCase() === status) {
+        lines[previousLineIndex] = previousTimeFirst
+          ? `${time}${status}`
+          : `${status}${time}`;
+        input.value = lines.join("\n");
+        return;
+      }
+    }
 
     const separator = input.value.trim() ? "\n" : "";
-    input.value = `${input.value.trimEnd()}${separator}${status}${time.trim()}`;
+    input.value = `${input.value.trimEnd()}${separator}${time}${status}`;
   });
 
   const handleParse = $(() => {
@@ -55,7 +94,7 @@ export default component$(() => {
             HOS Log Parser
           </h1>
           <p class="text-sm text-gray-500">
-            Enter status and interval end time. The day defaults to Off-duty (O); a status without a time sets the all-day default.
+            Enter status changes. A timestamp followed by a status starts that status at the given time; spaces are ignored. The day defaults to Off-duty (O).
           </p>
         </div>
 
@@ -63,9 +102,17 @@ export default component$(() => {
         <div>
           <textarea
             class="w-full h-48 p-3 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={`Enter one status change per line:
+            placeholder={`Timestamp + status starts a status at that time:
 
-O0630
+O
+0104D
+
+Or use status + interval end times:
+
+O630N645D900O
+
+or one entry per line:
+O630
 N645
 D900
 O`}

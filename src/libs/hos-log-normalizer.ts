@@ -34,40 +34,64 @@ function toMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function parseLine(line: string): { time: string | null; status: StatusKey } {
-  const cleaned = line.replace(/\s+/g, "");
-  const statusOnlyMatch = cleaned.match(/^([A-Za-z]+)$/);
+type ParsedEntry = {
+  time: string | null;
+  status: StatusKey;
+  token: string;
+  kind: "all-day" | "interval-end" | "transition";
+};
 
-  if (statusOnlyMatch) {
-    const status = statusOnlyMatch[1].toUpperCase();
+function parseEntries(input: string): ParsedEntry[] {
+  const entries: ParsedEntry[] = [];
 
-    if (!isStatusKey(status)) {
-      throw new Error(`Invalid status: "${line}"`);
+  for (const rawLine of input.split(/\r?\n/)) {
+    const compactLine = rawLine.replace(/\s/g, "");
+    if (!compactLine) continue;
+
+    const isTransitionLine = /^\d/.test(compactLine);
+    const tokenPattern = isTransitionLine
+      ? /(\d{1,2}:\d{2}|\d{3,4})([A-Za-z])/y
+      : /([A-Za-z])(\d{1,2}:\d{2}|\d{3,4})?/y;
+    let position = 0;
+
+    while (position < compactLine.length) {
+      tokenPattern.lastIndex = position;
+      const match = tokenPattern.exec(compactLine);
+
+      if (!match) {
+        throw new Error(`Invalid format: "${compactLine.slice(position)}"`);
+      }
+
+      const token = match[0];
+      const rawStatus = isTransitionLine ? match[2] : match[1];
+      const rawTime = isTransitionLine ? match[1] : match[2];
+      const status = rawStatus.toUpperCase();
+
+      if (!isStatusKey(status)) {
+        throw new Error(`Invalid status: "${token}"`);
+      }
+
+      const time = rawTime ? normalizeTime(rawTime) : null;
+
+      if (time && toMinutes(time) > 1440) {
+        throw new Error(`Time exceeds 24:00: "${token}"`);
+      }
+
+      entries.push({
+        time,
+        status,
+        token,
+        kind: time
+          ? isTransitionLine
+            ? "transition"
+            : "interval-end"
+          : "all-day",
+      });
+      position = tokenPattern.lastIndex;
     }
-
-    return { time: null, status };
   }
 
-  const match = cleaned.match(/^([A-Za-z]+)(\d{1,2}:?\d{2})$/);
-
-  if (!match) {
-    throw new Error(`Invalid format: "${line}"`);
-  }
-
-  const [, rawStatus, rawTime] = match;
-  const status = rawStatus.toUpperCase();
-
-  if (!isStatusKey(status)) {
-    throw new Error(`Invalid status: "${line}"`);
-  }
-
-  const time = normalizeTime(rawTime);
-
-  if (toMinutes(time) > 1440) {
-    throw new Error(`Time exceeds 24:00: "${line}"`);
-  }
-
-  return { time, status };
+  return entries;
 }
 
 export type ParseResult = {
@@ -78,54 +102,58 @@ export type ParseResult = {
 
 export function parseLogs(input: string): ParseResult {
 
-  const lines = input.split("\n");
-
   const result: DutyEntry[] = [];
   const duration = createEmptyStatusDuration();
 
-  const parsedLines = lines
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => ({ ...parseLine(line), line }));
-  const allDayEntries = parsedLines.filter(({ time }) => time === null);
+  const parsedEntries = parseEntries(input);
+  const allDayEntries = parsedEntries.filter(({ kind }) => kind === "all-day");
 
   if (allDayEntries.length > 1) {
     throw new Error("Only one status-only, all-day entry is allowed.");
   }
 
-  let prevTime = "00:00";
-  let prevMinutes = 0;
+  const timedEntries = parsedEntries.filter(
+    (entry): entry is ParsedEntry & { time: string } => entry.time !== null,
+  );
+  let previousMinutes = 0;
 
-  for (const { time, status, line } of parsedLines) {
-    if (time === null) continue;
-
+  for (const { time, token } of timedEntries) {
     const currentMinutes = toMinutes(time);
 
-    if (currentMinutes <= prevMinutes) {
-      throw new Error(`Time must be increasing: "${line}"`);
+    if (currentMinutes <= previousMinutes) {
+      throw new Error(`Time must be increasing: "${token}"`);
     }
 
-    duration[status] += currentMinutes - prevMinutes;
-
-    result.push({
-      startTime: prevTime,
-      endTime: time,
-      status: STATUS_MAP[status],
-    });
-
-    prevTime = time;
-    prevMinutes = currentMinutes;
+    previousMinutes = currentMinutes;
   }
 
-  // Fill to 24:00
-  if (prevMinutes < 1440) {
-    const finalStatus = allDayEntries[0]?.status ?? "O";
-    duration[finalStatus] += 1440 - prevMinutes;
+  const defaultStatus = allDayEntries[0]?.status ?? "O";
+  const intervalEndEntries = new Map(
+    timedEntries
+      .filter(({ kind }) => kind === "interval-end")
+      .map(({ time, status }) => [toMinutes(time), status]),
+  );
+  const transitions = timedEntries.filter(({ kind }) => kind === "transition");
+  const boundaries = [0, ...timedEntries.map(({ time }) => toMinutes(time))];
+  if (boundaries[boundaries.length - 1] !== 1440) boundaries.push(1440);
 
+  for (let index = 1; index < boundaries.length; index++) {
+    const startMinutes = boundaries[index - 1];
+    const endMinutes = boundaries[index];
+    const intervalStatus =
+      intervalEndEntries.get(endMinutes) ??
+      transitions
+        .filter(({ time }) => toMinutes(time) <= startMinutes)
+        .slice(-1)[0]?.status ??
+      defaultStatus;
+    const startTime = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+
+    duration[intervalStatus] += endMinutes - startMinutes;
     result.push({
-      startTime: prevTime,
-      endTime: "24:00",
-      status: STATUS_MAP[finalStatus],
+      startTime,
+      endTime,
+      status: STATUS_MAP[intervalStatus],
     });
   }
 
