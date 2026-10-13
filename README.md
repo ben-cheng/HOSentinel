@@ -48,6 +48,16 @@ npm start # or `bun start`
 
 > Note: during dev mode, Vite may request a significant number of `.js` files. This does not represent a Qwik production build.
 
+## Install as an app
+
+HOSentinel is a Progressive Web App. Deploy it over HTTPS, open it once while
+online, then use the browser's **Install app** or **Add to Home Screen** action.
+The service worker caches the app shell and same-origin resources for offline
+reopening. Log data is held in the page and is not synced or persisted offline.
+
+The manifest and service worker are served from the configured `/HOSentinel/`
+base path. If that deployment path changes, update `base` in `vite.config.ts`.
+
 ## Preview
 
 The preview command will create a production build of the client modules, a production build of `src/entry.preview.tsx`, and run a local server. The preview server is only for convenience to preview a production build locally and should not be used as a production server.
