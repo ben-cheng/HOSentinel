@@ -100,6 +100,37 @@ export type ParseResult = {
     error: string | null;
 }
 
+export function formatLogEntries(entries: DutyEntry[]): string[] {
+  return entries.map((entry) => {
+    const status = (Object.keys(STATUS_MAP) as StatusKey[]).find(
+      (key) => STATUS_MAP[key] === entry.status,
+    );
+
+    if (!status) {
+      throw new Error(`Unable to format unknown duty status: "${entry.status}"`);
+    }
+
+    return entry.endTime === "24:00"
+      ? status
+      : `${status}${entry.endTime.replace(":", "")}`;
+  });
+}
+
+export function getFinalStatus(entries: DutyEntry[]): StatusKey {
+  const finalEntry = entries[entries.length - 1];
+  if (!finalEntry) return "O";
+
+  const status = (Object.keys(STATUS_MAP) as StatusKey[]).find(
+    (key) => STATUS_MAP[key] === finalEntry.status,
+  );
+
+  if (!status) {
+    throw new Error(`Unable to find final status for "${finalEntry.status}"`);
+  }
+
+  return status;
+}
+
 export function parseLogs(input: string): ParseResult {
 
   const result: DutyEntry[] = [];

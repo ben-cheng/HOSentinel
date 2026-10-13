@@ -19,6 +19,7 @@ and calculating daily time totals by duty status.
 - `src/routes/index.tsx`: Main log-entry UI, status buttons, and duration display.
 - `src/libs/hos-log-normalizer.ts`: Input parsing, interval construction, and
   duration calculation.
+- `src/libs/hos-log-storage.ts`: IndexedDB storage for daily log records.
 - `src/models/duty-status.ts`: Status codes, labels, and duration types.
 - `src/models/duty-entry.ts`: Parsed duty interval type.
 - `src/components/hos-log-normalizer/hos-log-normalizer.spec.ts`: Duration
@@ -47,6 +48,23 @@ and calculating daily time totals by duty status.
 
 When changing the parser or these conventions, update the duration tests and
 the explanatory copy and examples in `src/routes/index.tsx` together.
+
+## Daily log storage
+
+- HOS logs are saved locally in IndexedDB, one record per local `YYYY-MM-DD`.
+- Persisted `logText` is a whitespace-free, compact string. Format interval
+  entries as status plus end time (for example `O0630`) and let the final
+  status-only code cover the remaining day.
+- Show saved logs in the editor as one status/time entry per line. Derive the
+  saved compact value and readable display from the parsed intervals so
+  timestamp-first input retains its meaning.
+- Editing a selected date does not persist until the user chooses **Save day
+  log**. Existing records load into the editor when selected.
+- When tracking the current local day, status-button updates save immediately.
+  At a date rollover, carry forward the final status from the most recent prior
+  saved day as the new day's starting status.
+- Explain that local IndexedDB data stays in the current browser/device and is
+  not synchronized or backed up remotely.
 
 ## Implementation notes
 

@@ -53,7 +53,21 @@ npm start # or `bun start`
 HOSentinel is a Progressive Web App. Deploy it over HTTPS, open it once while
 online, then use the browser's **Install app** or **Add to Home Screen** action.
 The service worker caches the app shell and same-origin resources for offline
-reopening. Log data is held in the page and is not synced or persisted offline.
+reopening. Daily HOS logs are stored in this browser's IndexedDB by local
+calendar date, so saved logs can be reopened and edited offline. Data is local
+to this browser/device and is not synced to another device.
+
+Choose a date, edit the log, then select **Save day log**. The saved-day list
+opens existing logs; the duration breakdown recalculates from the selected
+log. A new date starts with the default Off Duty (`O`) entry. Logs are stored
+as a whitespace-free, one-line value in IndexedDB and formatted as one
+status/time entry per line while viewing or editing.
+
+When tracking today, status-button changes save automatically. If the app
+crosses midnight while open, the next status change starts today's record with
+the final status from the most recent saved day. When opening a new day, that
+status is carried forward automatically; Off Duty (`O`) is used when there is
+no earlier saved log.
 
 The manifest and service worker are served from the configured `/HOSentinel/`
 base path. If that deployment path changes, update `base` in `vite.config.ts`.

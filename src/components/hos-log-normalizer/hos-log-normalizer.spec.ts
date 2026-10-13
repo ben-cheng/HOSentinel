@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { parseLogs } from "~/libs/hos-log-normalizer";
+import {
+  formatLogEntries,
+  getFinalStatus,
+  parseLogs,
+} from "~/libs/hos-log-normalizer";
 
 test("calculates durations for status-first end-time entries", () => {
   const { duration } = parseLogs("O0600\nn0630\nd0900");
@@ -54,4 +58,21 @@ test("a timestamp followed by a status starts that status at the given time", ()
     { startTime: "00:00", endTime: "01:04", status: "OFF_DUTY" },
     { startTime: "01:04", endTime: "24:00", status: "DRIVING" },
   ]);
+});
+
+test("formats readable lines that compact into one saved log value", () => {
+  const { value } = parseLogs("O\n0630D\n0645N\n0900O");
+  const displayLines = formatLogEntries(value);
+
+  expect(displayLines).toEqual(["O0630", "D0645", "N0900", "O"]);
+  expect(displayLines.join("")).toBe("O0630D0645N0900O");
+  expect(parseLogs(displayLines.join("")).duration).toEqual(
+    parseLogs("O\n0630D\n0645N\n0900O").duration,
+  );
+});
+
+test("gets the status to carry into the next day", () => {
+  const previousDay = parseLogs("O\n0630D\n0900N\n1200S");
+
+  expect(getFinalStatus(previousDay.value)).toBe("S");
 });
