@@ -353,25 +353,17 @@ export default component$(() => {
           </div>
         </section>
 
-        {/* Textarea */}
         <div>
+          <label
+            for="hos-log"
+            class="mb-2 block text-sm font-semibold text-gray-700"
+          >
+            Daily HOS log
+          </label>
           <textarea
+            id="hos-log"
             class="w-full h-48 p-3 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={!storageReady.value || isLoadingDay.value || isSaving.value}
-            placeholder={`Timestamp + status starts a status at that time:
-
-O
-0104D
-
-Or use status + interval end times:
-
-O630N645D900O
-
-or one entry per line:
-O630
-N645
-D900
-O`}
             value={input.value}
             onInput$={(e) =>
               (input.value = (e.target as HTMLTextAreaElement).value)
