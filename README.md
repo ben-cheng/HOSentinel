@@ -57,11 +57,13 @@ reopening. Daily HOS logs are stored in this browser's IndexedDB by local
 calendar date, so saved logs can be reopened and edited offline. Data is local
 to this browser/device and is not synced to another device.
 
-Choose a date, edit the log, then select **Save day log**. The saved-day list
-opens existing logs; the duration breakdown recalculates from the selected
-log. A new date starts with the default Off Duty (`O`) entry. Logs are stored
-as a whitespace-free, one-line value in IndexedDB and formatted as one
-status/time entry per line while viewing or editing.
+The main view always shows today's log and duration breakdown. Use **View past
+logs** to open a historical day in a slide-over panel. Historical changes are
+saved with **Save changes** or abandoned with **Discard**; status quick-entry
+buttons are only shown for today's live log. A new date starts with the
+default Off Duty (`O`) entry. Logs are stored as a whitespace-free, one-line
+value in IndexedDB and formatted as one status/time entry per line while
+viewing or editing.
 
 When tracking today, status-button changes save automatically. If the app
 crosses midnight while open, the next status change starts today's record with
