@@ -1,14 +1,44 @@
 import { component$ } from "@builder.io/qwik";
-import { STATUS_LABEL, StatusDuration, StatusKey } from "~/models/duty-status";
+import {
+  STATUS_LABEL,
+  STATUS_MAP,
+  StatusDuration,
+  StatusKey,
+} from "~/models/duty-status";
 
 interface DurationBreakdownProps {
   duration: StatusDuration;
   variant?: "card" | "section";
 }
 
+export function getRoundedDurationCents(
+  duration: StatusDuration,
+): Record<StatusKey, number> {
+  const statuses = Object.keys(STATUS_MAP) as StatusKey[];
+  const exactCents = statuses.map((status) => (duration[status] * 100) / 60);
+  const roundedCents = exactCents.map(Math.floor);
+  const targetCents = Math.round(
+    exactCents.reduce((total, cents) => total + cents, 0),
+  );
+  const remainingCents =
+    targetCents - roundedCents.reduce((total, cents) => total + cents, 0);
+  const fractionalRemainders = exactCents
+    .map((cents, index) => ({ index, remainder: cents - roundedCents[index] }))
+    .sort((left, right) => right.remainder - left.remainder);
+
+  for (let index = 0; index < remainingCents; index++) {
+    roundedCents[fractionalRemainders[index].index]++;
+  }
+
+  return Object.fromEntries(
+    statuses.map((status, index) => [status, roundedCents[index]]),
+  ) as Record<StatusKey, number>;
+}
+
 export const DurationBreakdown = component$(
   ({ duration, variant = "card" }: DurationBreakdownProps) => {
     const isCard = variant === "card";
+    const roundedCents = getRoundedDurationCents(duration);
 
     return (
       <section
@@ -39,7 +69,7 @@ export const DurationBreakdown = component$(
             >
               <span class="text-gray-700">{STATUS_LABEL[status]}</span>
               <span class="font-semibold text-blue-800">
-                {Number((duration[status] / 60).toFixed(2))} h
+                {Number((roundedCents[status] / 100).toFixed(2))} h
               </span>
             </div>
           ))}
