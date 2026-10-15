@@ -65,20 +65,20 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
     <div class="fixed inset-0 z-50 flex justify-end">
       <button
         type="button"
-        class="absolute inset-0 bg-black/20"
+        class="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
         aria-label="Close historical logs"
         onClick$={props.onDiscard}
       />
       <aside
-        class="relative flex h-full w-full max-w-xl animate-[history-slide-in_250ms_ease-out] flex-col bg-white shadow-2xl"
+        class="relative flex h-full w-full max-w-xl animate-[history-slide-in_250ms_ease-out] flex-col border-l border-slate-200 bg-white shadow-2xl"
         aria-label="Historical HOS log"
       >
-        <header class="flex items-start justify-between gap-4 border-b border-gray-200 p-5">
+        <header class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/80 p-6">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
               Historical record
             </p>
-            <h2 class="mt-1 text-xl font-bold text-gray-800">
+            <h2 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">
               {props.date
                 ? new Date(`${props.date}T00:00:00`).toLocaleDateString()
                 : "Select a day"}
@@ -86,7 +86,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
           </div>
           <button
             type="button"
-            class="rounded-lg p-2 text-2xl leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            class="rounded-xl p-2 text-2xl leading-none text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
             aria-label="Close historical logs"
             onClick$={props.onDiscard}
           >
@@ -94,13 +94,13 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
           </button>
         </header>
 
-        <div class="flex-1 space-y-5 overflow-y-auto p-5">
+        <div class="flex-1 space-y-6 overflow-y-auto p-6">
           <label class="flex max-w-xs flex-col gap-1 text-sm font-medium text-gray-700">
             Select historical day
             <input
               type="date"
               max={props.today}
-              class="rounded-lg border border-gray-300 px-3 py-2"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
               value={props.date}
               disabled={isBusy}
               onInput$={(event) => {
@@ -121,10 +121,10 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
                     key={record.date}
                     type="button"
                     disabled={isBusy}
-                    class={`rounded-full border px-3 py-1 text-sm ${
+                    class={`rounded-full border px-3 py-1.5 text-sm transition ${
                       props.date === record.date
-                        ? "border-blue-700 bg-blue-50 text-blue-800"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                        ? "border-blue-200 bg-blue-50 font-semibold text-blue-800"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                     onClick$={() => props.onSelectDay(record.date)}
                   >
@@ -145,7 +145,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
 
           <button
             type="button"
-            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
             disabled={isBusy || !props.date}
             onClick$={openLogDialog}
           >
@@ -155,10 +155,10 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
           <DurationBreakdown duration={props.duration} variant="section" />
         </div>
 
-        <footer class="flex justify-end border-t border-gray-200 p-5">
+        <footer class="flex justify-end border-t border-slate-100 bg-slate-50/70 p-5">
           <button
             type="button"
-            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             onClick$={props.onDiscard}
           >
             Close
@@ -167,16 +167,16 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
       </aside>
 
       {isLogDialogOpen.value && (
-        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <section
-            class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"
+            class="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-950/20 sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="historical-log-dialog-title"
           >
             <h2
               id="historical-log-dialog-title"
-              class="text-lg font-semibold text-gray-800"
+              class="text-xl font-bold tracking-tight text-slate-900"
             >
               Edit log for{" "}
               {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
@@ -191,13 +191,13 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
             )}
             <label
               for="historical-hos-log-view"
-              class="mb-2 mt-4 block text-sm font-semibold text-gray-700"
+              class="mb-2 mt-5 block text-sm font-semibold text-slate-700"
             >
               Daily HOS log
             </label>
             <textarea
               id="historical-hos-log-view"
-              class="h-56 w-full rounded-lg border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              class="h-56 w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 font-mono text-sm leading-6 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               disabled={props.isSaving}
               value={editedLog.value}
               onInput$={(event) => {
@@ -209,7 +209,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
             <footer class="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                class="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 disabled={props.isSaving}
                 onClick$={discardLogEdits}
               >
@@ -217,7 +217,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
               </button>
               <button
                 type="button"
-                class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
                   props.isSaving ||
                   editedLog.value === baselineLog.value ||

@@ -44,31 +44,29 @@ export const DurationBreakdown = component$(
       <section
         class={
           isCard
-            ? "space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4"
-            : "rounded-lg border border-blue-200 bg-blue-50 p-4"
+            ? "space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
+            : "rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
         }
       >
         <h3
           class={
             isCard
-              ? "text-sm font-semibold text-blue-700"
-              : "mb-3 text-sm font-semibold text-blue-700"
+              ? "text-sm font-semibold text-slate-800"
+              : "mb-4 text-sm font-semibold text-slate-800"
           }
         >
-          Duration Breakdown
+          Time by status
         </h3>
-        <div class="space-y-2">
+        <div class="grid grid-cols-2 gap-3">
           {(Object.keys(STATUS_LABEL) as StatusKey[]).map((status) => (
             <div
               key={status}
-              class={
-                isCard
-                  ? "flex items-center justify-between text-sm"
-                  : "flex justify-between text-sm"
-              }
+              class="flex min-h-16 flex-col justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm sm:flex-row sm:items-center"
             >
-              <span class="text-gray-700">{STATUS_LABEL[status]}</span>
-              <span class="font-semibold text-blue-800">
+              <span class="text-xs font-medium text-slate-500">
+                {STATUS_LABEL[status]}
+              </span>
+              <span class="text-lg font-bold tabular-nums text-slate-900">
                 {Number((roundedCents[status] / 100).toFixed(2))} h
               </span>
             </div>

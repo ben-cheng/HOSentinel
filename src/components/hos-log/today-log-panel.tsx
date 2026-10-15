@@ -7,13 +7,6 @@ import type { DutyStatus } from "~/models/duty-status";
 import type { StatusDuration } from "~/models/duty-status";
 import type { StatusKey } from "~/models/duty-status";
 
-const CURRENT_STATUS_LABEL: Record<DutyStatus, string> = {
-  OFF_DUTY: "off-duty",
-  SLEEPER: "sleeper",
-  DRIVING: "driving",
-  ON_DUTY_NOT_DRIVING: "on-duty not driving",
-};
-
 const DUTY_STATUS_KEY: Partial<Record<DutyStatus, StatusKey>> = {
   OFF_DUTY: "O",
   DRIVING: "D",
@@ -24,20 +17,24 @@ function getStatusKey(entry?: DutyEntry): StatusKey | undefined {
   return entry ? DUTY_STATUS_KEY[entry.status] : undefined;
 }
 
-function getStatusButtonClass(
+function getStatusPanelClass(
   status: StatusKey,
   currentDutyEntry?: DutyEntry,
 ): string {
   const base =
-    "rounded-lg px-4 py-2 text-sm font-semibold text-white ring-offset-2";
+    "relative flex min-h-36 w-full flex-col items-start justify-between rounded-2xl border p-3 text-left shadow-sm transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed sm:p-4";
   const active = getStatusKey(currentDutyEntry) === status;
-  const styles: Record<StatusKey, string> = {
-    O: "bg-gray-600 hover:bg-gray-700",
-    S: "bg-purple-600 hover:bg-purple-700",
-    D: "bg-blue-600 hover:bg-blue-700",
-    N: "bg-amber-600 hover:bg-amber-700",
+  const activeStyles: Record<StatusKey, string> = {
+    O: "border-slate-300 bg-slate-100 text-slate-900 shadow-slate-200",
+    S: "border-violet-200 bg-violet-50 text-violet-950 shadow-violet-100",
+    D: "border-blue-200 bg-blue-50 text-blue-950 shadow-blue-100",
+    N: "border-amber-200 bg-amber-50 text-amber-950 shadow-amber-100",
   };
-  return `${base} ${styles[status]}${active ? " ring-4 ring-blue-300" : ""}`;
+  const inactiveStyles =
+    "border-slate-200 bg-slate-50 text-slate-500 opacity-65 hover:border-slate-300 hover:bg-white hover:opacity-100";
+  return `${base} ${
+    active ? `${activeStyles[status]} ring-2 ring-blue-200` : inactiveStyles
+  }`;
 }
 
 function getLocalDateKey(date: Date): string {
@@ -108,24 +105,31 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
   return (
     <>
       <div
-        class="w-full max-w-3xl space-y-6 rounded-2xl bg-white p-6 shadow-lg"
+        class="mx-auto w-full max-w-4xl space-y-8 rounded-3xl border border-white/80 bg-white p-5 shadow-xl shadow-slate-300/50 sm:p-8"
         aria-hidden={props.historyOpen || isLogDialogOpen.value}
         inert={props.historyOpen || isLogDialogOpen.value}
       >
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">HOS Log Parser</h1>
-          <p class="text-sm text-gray-500">
+        <div class="border-b border-slate-100 pb-6">
+          <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">
+            HOSentinel · Daily log
+          </p>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            Hours of Service
+          </h1>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
             A status followed by a time ends that interval. A final status
             without a time is temporary; unassigned time is Off-duty (O).
           </p>
         </div>
 
-        <section class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
+        <section class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
           <div>
-            <h2 class="text-sm font-semibold text-gray-700">Today</h2>
-            <p class="text-sm text-gray-500">
-              {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Selected day
             </p>
+            <h2 class="mt-1 text-lg font-semibold text-slate-900">
+              {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
+            </h2>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             {props.loadedRecord &&
@@ -136,7 +140,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               )}
             <button
               type="button"
-              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isDisabled}
               onClick$={props.onOpenHistory}
             >
@@ -144,7 +148,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             </button>
             <button
               type="button"
-              class="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
+              class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:opacity-50"
               disabled={
                 isDisabled || props.date !== getLocalDateKey(new Date())
               }
@@ -152,7 +156,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             >
               {props.isDayComplete ? "Reopen day" : "Mark day complete"}
             </button>
-            <p class="w-full text-xs text-gray-500">
+            <p class="w-full text-xs leading-5 text-slate-500">
               {props.isDayComplete
                 ? "Remaining time is counted as Off-duty."
                 : "The breakdown shows elapsed time until you mark the day complete."}
@@ -170,77 +174,130 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           )}
         </section>
 
-        {props.date === getLocalDateKey(new Date()) &&
-          props.currentDutyEntry && (
-            <p
-              class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950"
-              aria-live="polite"
-            >
-              You are currently{" "}
-              <strong>
-                {CURRENT_STATUS_LABEL[props.currentDutyEntry.status]}
-              </strong>{" "}
-              since <strong>{props.currentDutyEntry.startTime}</strong>.
-            </p>
-          )}
-
-        <div>
-          <button
-            type="button"
-            class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
-            disabled={isDisabled}
-            onClick$={openLogDialog}
-          >
-            {isReadOnly ? "View log" : "Edit log"}
-          </button>
-        </div>
-
-        {!props.historyOpen && (
-          <div class="flex flex-wrap gap-2">
+        <section class="space-y-4">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold text-slate-900">
+                Duty status
+              </h2>
+              <p class="mt-1 text-sm text-slate-500">
+                Select your current activity to record a status change.
+              </p>
+            </div>
             <button
               type="button"
-              class={getStatusButtonClass("O", props.currentDutyEntry)}
-              aria-pressed={getStatusKey(props.currentDutyEntry) === "O"}
-              disabled={isStatusDisabled}
-              onClick$={() => props.onAddStatus("O")}
+              class="text-sm font-semibold text-blue-700 transition hover:text-blue-900"
+              disabled={isDisabled}
+              onClick$={openLogDialog}
             >
-              Off-duty
-              {getStatusKey(props.currentDutyEntry) === "O" && (
-                <span class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                  Current
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              class={getStatusButtonClass("D", props.currentDutyEntry)}
-              aria-pressed={getStatusKey(props.currentDutyEntry) === "D"}
-              disabled={isStatusDisabled}
-              onClick$={() => props.onAddStatus("D")}
-            >
-              Driving
-              {getStatusKey(props.currentDutyEntry) === "D" && (
-                <span class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                  Current
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              class={getStatusButtonClass("N", props.currentDutyEntry)}
-              aria-pressed={getStatusKey(props.currentDutyEntry) === "N"}
-              disabled={isStatusDisabled}
-              onClick$={() => props.onAddStatus("N")}
-            >
-              On-duty not driving
-              {getStatusKey(props.currentDutyEntry) === "N" && (
-                <span class="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                  Current
-                </span>
-              )}
+              {isReadOnly ? "View log" : "Edit log"}
             </button>
           </div>
-        )}
+
+          {!props.historyOpen && (
+            <div class="grid grid-cols-3 gap-2 sm:gap-3">
+              <button
+                type="button"
+                class={getStatusPanelClass("O", props.currentDutyEntry)}
+                aria-pressed={getStatusKey(props.currentDutyEntry) === "O"}
+                disabled={isStatusDisabled}
+                onClick$={() => props.onAddStatus("O")}
+              >
+                <span class="flex h-6 w-full shrink-0 items-start justify-end">
+                  <span
+                    class={`rounded-full bg-blue-700 px-2 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-white sm:text-[0.65rem] ${
+                      getStatusKey(props.currentDutyEntry) === "O"
+                        ? ""
+                        : "invisible"
+                    }`}
+                    aria-hidden={getStatusKey(props.currentDutyEntry) !== "O"}
+                  >
+                    Current
+                  </span>
+                </span>
+                <span class="flex min-h-8 flex-1 items-center text-xs font-bold leading-tight sm:text-sm">
+                  Off-duty
+                </span>
+                <span
+                  class={`h-5 text-[0.65rem] font-medium text-slate-600 sm:text-xs ${
+                    getStatusKey(props.currentDutyEntry) === "O"
+                      ? ""
+                      : "invisible"
+                  }`}
+                  aria-hidden={getStatusKey(props.currentDutyEntry) !== "O"}
+                >
+                  Since {props.currentDutyEntry?.startTime}
+                </span>
+              </button>
+              <button
+                type="button"
+                class={getStatusPanelClass("D", props.currentDutyEntry)}
+                aria-pressed={getStatusKey(props.currentDutyEntry) === "D"}
+                disabled={isStatusDisabled}
+                onClick$={() => props.onAddStatus("D")}
+              >
+                <span class="flex h-6 w-full shrink-0 items-start justify-end">
+                  <span
+                    class={`rounded-full bg-blue-700 px-2 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-white sm:text-[0.65rem] ${
+                      getStatusKey(props.currentDutyEntry) === "D"
+                        ? ""
+                        : "invisible"
+                    }`}
+                    aria-hidden={getStatusKey(props.currentDutyEntry) !== "D"}
+                  >
+                    Current
+                  </span>
+                </span>
+                <span class="flex min-h-8 flex-1 items-center text-xs font-bold leading-tight sm:text-sm">
+                  Driving
+                </span>
+                <span
+                  class={`h-5 text-[0.65rem] font-medium text-slate-600 sm:text-xs ${
+                    getStatusKey(props.currentDutyEntry) === "D"
+                      ? ""
+                      : "invisible"
+                  }`}
+                  aria-hidden={getStatusKey(props.currentDutyEntry) !== "D"}
+                >
+                  Since {props.currentDutyEntry?.startTime}
+                </span>
+              </button>
+              <button
+                type="button"
+                class={getStatusPanelClass("N", props.currentDutyEntry)}
+                aria-pressed={getStatusKey(props.currentDutyEntry) === "N"}
+                disabled={isStatusDisabled}
+                onClick$={() => props.onAddStatus("N")}
+              >
+                <span class="flex h-6 w-full shrink-0 items-start justify-end">
+                  <span
+                    class={`rounded-full bg-blue-700 px-2 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-white sm:text-[0.65rem] ${
+                      getStatusKey(props.currentDutyEntry) === "N"
+                        ? ""
+                        : "invisible"
+                    }`}
+                    aria-hidden={getStatusKey(props.currentDutyEntry) !== "N"}
+                  >
+                    Current
+                  </span>
+                </span>
+                <span class="flex min-h-8 flex-1 items-center text-xs font-bold leading-tight sm:text-sm">
+                  On-duty not driving
+                </span>
+                <span
+                  class={`h-5 text-[0.65rem] font-medium text-slate-600 sm:text-xs ${
+                    getStatusKey(props.currentDutyEntry) === "N"
+                      ? ""
+                      : "invisible"
+                  }`}
+                  aria-hidden={getStatusKey(props.currentDutyEntry) !== "N"}
+                >
+                  Since {props.currentDutyEntry?.startTime}
+                </span>
+              </button>
+            </div>
+          )}
+        </section>
 
         <div class="flex min-h-6 items-center justify-between">
           {props.error && (
@@ -249,8 +306,8 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
         </div>
 
         <div>
-          <h2 class="mb-2 text-lg font-semibold text-gray-700">
-            Parsed Output
+          <h2 class="mb-3 text-base font-semibold text-slate-900">
+            Today’s breakdown
           </h2>
           <DurationBreakdown duration={props.calculatedDuration} />
         </div>
@@ -259,26 +316,26 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
       {isLogDialogOpen.value && (
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <section
-            class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"
+            class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-950/20 sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="today-log-dialog-title"
           >
             <h2
               id="today-log-dialog-title"
-              class="text-lg font-semibold text-gray-800"
+              class="text-xl font-bold tracking-tight text-slate-900"
             >
               {isReadOnly ? "View log" : "Edit log"}
             </h2>
             <label
               for="hos-log"
-              class="mb-2 mt-4 block text-sm font-semibold text-gray-700"
+              class="mb-2 mt-5 block text-sm font-semibold text-slate-700"
             >
               Daily HOS log
             </label>
             <textarea
               id="hos-log"
-              class="h-56 w-full rounded-lg border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              class="h-64 w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 font-mono text-sm leading-6 text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               readOnly={isReadOnly}
               value={editedLog.value}
               onInput$={(event) => {
@@ -287,7 +344,10 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               }}
             />
             {(props.error || props.storageError || saveError.value) && (
-              <p role="alert" class="mt-2 text-sm text-red-600">
+              <p
+                role="alert"
+                class="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+              >
                 {props.error ||
                   (props.storageError
                     ? `Local storage error: ${props.storageError}`
@@ -298,7 +358,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               {isReadOnly ? (
                 <button
                   type="button"
-                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  class="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   onClick$={closeLogDialog}
                 >
                   Close
@@ -307,7 +367,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
                 <>
                   <button
                     type="button"
-                    class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    class="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                     disabled={props.isSaving}
                     onClick$={closeLogDialog}
                   >
@@ -315,7 +375,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
                   </button>
                   <button
                     type="button"
-                    class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={isDisabled || editedLog.value === props.input}
                     onClick$={saveLogEdits}
                   >

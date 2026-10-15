@@ -554,7 +554,7 @@ export default component$(() => {
   });
 
   return (
-    <div class="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
+    <div class="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100 px-4 py-8 sm:px-6 lg:py-12">
       <TodayLogPanel
         date={selectedDate.value}
         input={input.value}
