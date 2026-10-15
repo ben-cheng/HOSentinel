@@ -1,4 +1,4 @@
-import { component$ } from "@builder.io/qwik";
+import { component$, useSignal } from "@builder.io/qwik";
 import type { QRL } from "@builder.io/qwik";
 import { DurationBreakdown } from "./duration-breakdown";
 import type { HosLogRecord } from "~/libs/hos-log-storage";
@@ -22,6 +22,7 @@ interface HistoryDrawerProps {
 }
 
 export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
+  const isEditingLog = useSignal(false);
   const historicalLogs = props.savedLogs.filter(
     (record) => record.date < props.today,
   );
@@ -118,23 +119,37 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
           )}
 
           <div>
-            <label
-              for="historical-hos-log"
-              class="mb-2 block text-sm font-semibold text-gray-700"
-            >
-              Daily HOS log
-            </label>
-            <textarea
-              id="historical-hos-log"
-              class="h-48 w-full rounded-lg border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+            <button
+              type="button"
+              class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
               disabled={isBusy}
-              value={props.input}
-              onInput$={props.onInput}
-            />
+              aria-expanded={isEditingLog.value}
+              aria-controls="historical-log-editor"
+              onClick$={() => (isEditingLog.value = !isEditingLog.value)}
+            >
+              {isEditingLog.value ? "Done editing log" : "Edit log"}
+            </button>
             {props.error && (
               <p role="alert" class="mt-2 text-sm text-red-600">
                 {props.error}
               </p>
+            )}
+            {isEditingLog.value && (
+              <div id="historical-log-editor" class="mt-3">
+                <label
+                  for="historical-hos-log"
+                  class="mb-2 block text-sm font-semibold text-gray-700"
+                >
+                  Daily HOS log
+                </label>
+                <textarea
+                  id="historical-hos-log"
+                  class="h-48 w-full rounded-lg border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  disabled={isBusy}
+                  value={props.input}
+                  onInput$={props.onInput}
+                />
+              </div>
             )}
           </div>
 

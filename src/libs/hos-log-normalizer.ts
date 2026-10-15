@@ -1,5 +1,11 @@
 import { DutyEntry } from "~/models/duty-entry";
-import { createEmptyStatusDuration, isStatusKey, STATUS_MAP, StatusDuration, StatusKey } from "~/models/duty-status";
+import {
+  createEmptyStatusDuration,
+  isStatusKey,
+  STATUS_MAP,
+  StatusDuration,
+  StatusKey,
+} from "~/models/duty-status";
 
 function normalizeTime(raw: string): string {
   raw = raw.trim();
@@ -95,9 +101,22 @@ function parseEntries(input: string): ParsedEntry[] {
 }
 
 export type ParseResult = {
-    value: DutyEntry[];
-    duration: StatusDuration;
-    error: string | null;
+  value: DutyEntry[];
+  duration: StatusDuration;
+  error: string | null;
+};
+
+export function getActiveDutyEntry(
+  entries: DutyEntry[],
+  minuteOfDay: number,
+): DutyEntry | undefined {
+  return entries.find((entry) => {
+    const [startHour, startMinute] = entry.startTime.split(":").map(Number);
+    const [endHour, endMinute] = entry.endTime.split(":").map(Number);
+    const start = startHour * 60 + startMinute;
+    const end = endHour * 60 + endMinute;
+    return minuteOfDay >= start && minuteOfDay < end;
+  });
 }
 
 export function formatLogEntries(entries: DutyEntry[]): string[] {
@@ -107,7 +126,9 @@ export function formatLogEntries(entries: DutyEntry[]): string[] {
     );
 
     if (!status) {
-      throw new Error(`Unable to format unknown duty status: "${entry.status}"`);
+      throw new Error(
+        `Unable to format unknown duty status: "${entry.status}"`,
+      );
     }
 
     return entry.endTime === "24:00"
@@ -132,7 +153,6 @@ export function getFinalStatus(entries: DutyEntry[]): StatusKey {
 }
 
 export function parseLogs(input: string): ParseResult {
-
   const result: DutyEntry[] = [];
   const duration = createEmptyStatusDuration();
 
@@ -192,5 +212,5 @@ export function parseLogs(input: string): ParseResult {
     value: result,
     duration: duration,
     error: null,
-  }
+  };
 }

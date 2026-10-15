@@ -60,8 +60,10 @@ to this browser/device and is not synced to another device.
 The main view always shows today's log and duration breakdown. Use **View past
 logs** to open a historical day in a slide-over panel. Historical changes are
 saved with **Save changes** or abandoned with **Discard**; status quick-entry
-buttons are only shown for today's live log. A new date starts with the
-default Off Duty (`O`) entry. Logs are stored as a whitespace-free, one-line
+buttons are only shown for today's live log. The raw log editor is hidden until
+**Edit log** is selected in either view. Today's editor opens a dialog with
+**Save** and **Discard**; status-button changes continue to save automatically.
+A new date starts with the default Off Duty (`O`) entry. Logs are stored as a whitespace-free, one-line
 value in IndexedDB and formatted as one status/time entry per line while
 viewing or editing.
 

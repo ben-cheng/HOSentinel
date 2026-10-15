@@ -4,23 +4,22 @@ import {
   $,
   useTask$,
   useOnWindow,
+  isServer,
 } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import {
   formatLogEntries,
   getFinalStatus,
+  getActiveDutyEntry,
   parseLogs,
 } from "~/libs/hos-log-normalizer";
-import {
-  getHosLog,
-  listHosLogs,
-  saveHosLog,
-} from "~/libs/hos-log-storage";
+import type { ParseResult } from "~/libs/hos-log-normalizer";
+import { updateLogForStatus } from "~/libs/hos-log-status-updater";
+import { getHosLog, listHosLogs, saveHosLog } from "~/libs/hos-log-storage";
 import type { HosLogRecord } from "~/libs/hos-log-storage";
 import { DutyEntry } from "~/models/duty-entry";
 import {
   createEmptyStatusDuration,
-  isStatusKey,
   StatusDuration,
 } from "~/models/duty-status";
 import { HistoryDrawer } from "~/components/hos-log/history-drawer";
@@ -31,6 +30,10 @@ function getLocalDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getMinuteOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
 }
 
 function getPreviousLocalDateKey(date: Date | string): string {
@@ -51,7 +54,9 @@ export default component$(() => {
   const input = useSignal("O");
   const selectedDate = useSignal("");
   const result = useSignal<DutyEntry[]>([]);
-  const calculatedDuration = useSignal<StatusDuration>(createEmptyStatusDuration());
+  const calculatedDuration = useSignal<StatusDuration>(
+    createEmptyStatusDuration(),
+  );
   const error = useSignal<string | null>(null);
   const storageError = useSignal<string | null>(null);
   const storageMessage = useSignal<string | null>(null);
@@ -60,7 +65,9 @@ export default component$(() => {
   const historyOpen = useSignal(false);
   const historyDate = useSignal("");
   const historyInput = useSignal("");
-  const historyDuration = useSignal<StatusDuration>(createEmptyStatusDuration());
+  const historyDuration = useSignal<StatusDuration>(
+    createEmptyStatusDuration(),
+  );
   const historyError = useSignal<string | null>(null);
   const historyStorageError = useSignal<string | null>(null);
   const historyBaseline = useSignal("");
@@ -70,6 +77,44 @@ export default component$(() => {
   const isLoadingDay = useSignal(false);
   const isSaving = useSignal(false);
   const historyRequestId = useSignal(0);
+  const currentMinute = useSignal(getMinuteOfDay(new Date()));
+  const currentDutyEntry = useSignal<DutyEntry>();
+
+  const updateCurrentLogState = $((logText: string): ParseResult | null => {
+    try {
+      const parsed = parseLogs(logText);
+      result.value = parsed.value;
+      calculatedDuration.value = parsed.duration;
+      error.value = parsed.error;
+      return parsed;
+    } catch (cause) {
+      result.value = [];
+      calculatedDuration.value = createEmptyStatusDuration();
+      error.value =
+        cause instanceof Error
+          ? cause.message
+          : "Failed to parse this day's log.";
+      return null;
+    }
+  });
+
+  useTask$(({ track }) => {
+    const entries = track(() => result.value);
+    const minute = track(() => currentMinute.value);
+    currentDutyEntry.value = getActiveDutyEntry(entries, minute);
+  });
+
+  useTask$(({ cleanup }) => {
+    if (isServer) return;
+
+    const updateCurrentMinute = () => {
+      const now = new Date();
+      currentMinute.value = getMinuteOfDay(now);
+    };
+    updateCurrentMinute();
+    const interval = setInterval(updateCurrentMinute, 15_000);
+    cleanup(() => clearInterval(interval));
+  });
 
   const refreshSavedLogs = $(async () => {
     const records = await listHosLogs();
@@ -82,21 +127,8 @@ export default component$(() => {
 
     storageError.value = null;
     storageMessage.value = null;
-    error.value = null;
-
-    let parsed;
-    try {
-      parsed = parseLogs(logText);
-    } catch (cause) {
-      result.value = [];
-      error.value =
-        cause instanceof Error ? cause.message : "Failed to parse this day's log.";
-      return false;
-    }
-
-    calculatedDuration.value = parsed.duration;
-    result.value = parsed.value;
-    error.value = parsed.error;
+    const parsed = await updateCurrentLogState(logText);
+    if (!parsed) return false;
     isSaving.value = true;
     try {
       const displayLog = formatLogEntries(parsed.value).join("\n");
@@ -115,7 +147,9 @@ export default component$(() => {
       return true;
     } catch (cause) {
       storageError.value =
-        cause instanceof Error ? cause.message : "Failed to save this day's log.";
+        cause instanceof Error
+          ? cause.message
+          : "Failed to save this day's log.";
       return false;
     } finally {
       isSaving.value = false;
@@ -159,7 +193,9 @@ export default component$(() => {
     } catch (cause) {
       if (requestId === historyRequestId.value) {
         historyStorageError.value =
-          cause instanceof Error ? cause.message : "Failed to load this day's log.";
+          cause instanceof Error
+            ? cause.message
+            : "Failed to load this day's log.";
       }
     } finally {
       if (requestId === historyRequestId.value) {
@@ -188,7 +224,9 @@ export default component$(() => {
       parsed = parseLogs(historyInput.value);
     } catch (cause) {
       historyError.value =
-        cause instanceof Error ? cause.message : "Failed to parse this day's log.";
+        cause instanceof Error
+          ? cause.message
+          : "Failed to parse this day's log.";
       return;
     }
 
@@ -207,15 +245,17 @@ export default component$(() => {
       discardHistoricalChanges();
     } catch (cause) {
       historyStorageError.value =
-        cause instanceof Error ? cause.message : "Failed to save this day's log.";
+        cause instanceof Error
+          ? cause.message
+          : "Failed to save this day's log.";
     } finally {
       isHistorySaving.value = false;
     }
   });
 
-  const saveCurrentDay = $(async () => {
-    if (!selectedDate.value) return;
-    await persistLog(selectedDate.value, input.value);
+  const saveEditedLog = $(async (logText: string) => {
+    if (!selectedDate.value) return false;
+    return persistLog(selectedDate.value, logText);
   });
 
   const openHistory = $(() => {
@@ -235,19 +275,17 @@ export default component$(() => {
     try {
       const records = await refreshSavedLogs();
       const record = await getHosLog(today);
-      const startingStatus = record
-        ? "O"
-        : getStartingStatus(today, records);
+      const startingStatus = record ? "O" : getStartingStatus(today, records);
       const displayLog = record
         ? formatLogEntries(parseLogs(record.logText).value).join("\n")
         : startingStatus;
       selectedDate.value = today;
-      loadedRecord.value = record
-        ? { ...record, logText: displayLog }
-        : null;
+      loadedRecord.value = record ? { ...record, logText: displayLog } : null;
       input.value = displayLog;
       if (!record) {
         await persistLog(today, startingStatus);
+      } else {
+        await updateCurrentLogState(displayLog);
       }
     } catch (cause) {
       storageError.value =
@@ -269,12 +307,12 @@ export default component$(() => {
         const displayLog = record
           ? formatLogEntries(parseLogs(record.logText).value).join("\n")
           : carryStatus;
-        loadedRecord.value = record
-          ? { ...record, logText: displayLog }
-          : null;
+        loadedRecord.value = record ? { ...record, logText: displayLog } : null;
         input.value = displayLog;
         if (!record) {
           await persistLog(today, carryStatus);
+        } else {
+          await updateCurrentLogState(displayLog);
         }
       } catch (cause) {
         storageError.value =
@@ -296,89 +334,12 @@ export default component$(() => {
       if (storageError.value) return;
     }
 
-    const lines = input.value.split("\n");
-    let previousLineIndex = lines.length - 1;
-    while (previousLineIndex >= 0 && !lines[previousLineIndex].trim()) {
-      previousLineIndex--;
-    }
-    const previousLine = lines[previousLineIndex]?.replace(/\s+/g, "");
-
-    if (previousLine?.length === 1 && previousLine.toUpperCase() === status) {
-      return;
-    }
-
-    const now = new Date();
-    const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    const transitionEntry = previousLine?.match(/^(\d{1,2}:?\d{2})([A-Za-z])$/);
-    const intervalEndEntry = previousLine?.match(/^([A-Za-z])(\d{1,2}:?\d{2})$/);
-    const previousStatus = transitionEntry?.[2] ?? intervalEndEntry?.[1];
-    const previousTimeRaw = transitionEntry?.[1] ?? intervalEndEntry?.[2];
-    const previousTimeFirst = Boolean(transitionEntry);
-
-    if (
-      previousStatus &&
-      previousTimeRaw &&
-      isStatusKey(previousStatus.toUpperCase())
-    ) {
-      const previousTime = previousTimeRaw.replace(":", "").padStart(4, "0");
-
-      if (previousTime === time) {
-        lines[previousLineIndex] = previousTimeFirst
-          ? `${previousTimeRaw}${status}`
-          : `${status}${previousTimeRaw}`;
-        const updatedLog = lines.join("\n");
-        input.value = updatedLog;
-        if (selectedDate.value === today) {
-          await persistLog(selectedDate.value, updatedLog);
-        }
-        return;
-      }
-
-      if (previousStatus.toUpperCase() === status) {
-        lines[previousLineIndex] = previousTimeFirst
-          ? `${time}${status}`
-          : `${status}${time}`;
-        const updatedLog = lines.join("\n");
-        input.value = updatedLog;
-        if (selectedDate.value === today) {
-          await persistLog(selectedDate.value, updatedLog);
-        }
-        return;
-      }
-    }
-
-    const separator = input.value.trim() ? "\n" : "";
-    const updatedLog = `${input.value.trimEnd()}${separator}${time}${status}`;
+    const updatedLog = updateLogForStatus(input.value, status, new Date());
+    if (updatedLog === input.value) return;
     input.value = updatedLog;
     if (selectedDate.value === today) {
       await persistLog(selectedDate.value, updatedLog);
     }
-  });
-
-  const handleParse = $(() => {
-    error.value = null;
-
-    try {
-      const { duration, value, error: err } = parseLogs(input.value);
-
-      calculatedDuration.value = duration;
-      result.value = value;
-      error.value = err;
-    } catch (e: any) {
-      result.value = [];
-      error.value = e.message || "Failed to parse logs";
-    }
-  });
-
-  useTask$(({ track, cleanup }) => {
-    track(() => input.value);
-    const id = setTimeout(() => {
-      handleParse();
-    }, 500);
-    cleanup(() => {
-      clearTimeout(id);
-      // Cleanup logic if needed
-    });
   });
 
   useTask$(({ track }) => {
@@ -388,7 +349,9 @@ export default component$(() => {
       historyError.value = null;
     } catch (cause) {
       historyError.value =
-        cause instanceof Error ? cause.message : "Failed to parse this day's log.";
+        cause instanceof Error
+          ? cause.message
+          : "Failed to parse this day's log.";
     }
   });
 
@@ -397,6 +360,7 @@ export default component$(() => {
       <TodayLogPanel
         date={selectedDate.value}
         input={input.value}
+        currentDutyEntry={currentDutyEntry.value}
         calculatedDuration={calculatedDuration.value}
         error={error.value}
         storageError={storageError.value}
@@ -407,10 +371,7 @@ export default component$(() => {
         isLoadingDay={isLoadingDay.value}
         isSaving={isSaving.value}
         onOpenHistory={openHistory}
-        onSaveCurrentDay={saveCurrentDay}
-        onInput={$((event: Event) => {
-          input.value = (event.target as HTMLTextAreaElement).value;
-        })}
+        onSaveLog={saveEditedLog}
         onAddStatus={addStatusEntry}
       />
 
