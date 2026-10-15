@@ -56,6 +56,7 @@ interface TodayLogPanelProps {
   storageError: string | null;
   storageMessage: string | null;
   loadedRecord: HosLogRecord | null;
+  isDayComplete: boolean;
   historyOpen: boolean;
   storageReady: boolean;
   isLoadingDay: boolean;
@@ -63,6 +64,7 @@ interface TodayLogPanelProps {
   onOpenHistory: QRL<() => void>;
   onSaveLog: QRL<(logText: string) => Promise<boolean>>;
   onAddStatus: QRL<(status: "O" | "D" | "N") => Promise<void>>;
+  onSetDayComplete: QRL<(completed: boolean) => Promise<boolean | void>>;
 }
 
 export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
@@ -70,6 +72,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
   const editedLog = useSignal("");
   const isDisabled =
     !props.storageReady || props.isLoadingDay || props.isSaving;
+  const isStatusDisabled = isDisabled || props.isDayComplete;
 
   const openLogEditor = $(() => {
     editedLog.value = props.input;
@@ -95,9 +98,8 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
         <div>
           <h1 class="text-2xl font-bold text-gray-800">HOS Log Parser</h1>
           <p class="text-sm text-gray-500">
-            Enter status changes. A timestamp followed by a status starts that
-            status at the given time; spaces are ignored. The day defaults to
-            Off-duty (O).
+            A status followed by a time ends that interval. A final status
+            without a time is temporary; unassigned time is Off-duty (O).
           </p>
         </div>
 
@@ -123,6 +125,21 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             >
               View past logs
             </button>
+            <button
+              type="button"
+              class="rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
+              disabled={
+                isDisabled || props.date !== getLocalDateKey(new Date())
+              }
+              onClick$={() => props.onSetDayComplete(!props.isDayComplete)}
+            >
+              {props.isDayComplete ? "Reopen day" : "Mark day complete"}
+            </button>
+            <p class="w-full text-xs text-gray-500">
+              {props.isDayComplete
+                ? "Remaining time is counted as Off-duty."
+                : "The breakdown shows elapsed time until you mark the day complete."}
+            </p>
           </div>
           {props.storageError && (
             <p role="alert" class="w-full text-sm text-red-600">
@@ -154,7 +171,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           <button
             type="button"
             class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
-            disabled={isDisabled}
+            disabled={isStatusDisabled}
             onClick$={openLogEditor}
           >
             Edit log
@@ -167,7 +184,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               type="button"
               class={getStatusButtonClass("O", props.currentDutyEntry)}
               aria-pressed={getStatusKey(props.currentDutyEntry) === "O"}
-              disabled={isDisabled}
+              disabled={isStatusDisabled}
               onClick$={() => props.onAddStatus("O")}
             >
               Off-duty
@@ -181,7 +198,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               type="button"
               class={getStatusButtonClass("D", props.currentDutyEntry)}
               aria-pressed={getStatusKey(props.currentDutyEntry) === "D"}
-              disabled={isDisabled}
+              disabled={isStatusDisabled}
               onClick$={() => props.onAddStatus("D")}
             >
               Driving
@@ -195,7 +212,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               type="button"
               class={getStatusButtonClass("N", props.currentDutyEntry)}
               aria-pressed={getStatusKey(props.currentDutyEntry) === "N"}
-              disabled={isDisabled}
+              disabled={isStatusDisabled}
               onClick$={() => props.onAddStatus("N")}
             >
               On-duty not driving

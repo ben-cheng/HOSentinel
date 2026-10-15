@@ -1,6 +1,6 @@
 # HOSentinel Daily Log Format
 
-**Status:** Draft for user verification
+**Status:** Agreed behavior contract
 
 **Purpose:** Define the meaning and canonical representation of daily HOS logs
 before further parser or status-button changes are made.
@@ -292,6 +292,10 @@ user confirms that the day is complete. Once the day is marked complete, the
 remaining time through midnight is counted as Off-duty, bringing the day's
 total to 24 hours.
 
+The completion action records the local completion time with the daily record.
+Reopening a completed day removes that completion time and restores the
+elapsed-time breakdown.
+
 For a past dated log, a final temporary status extends through midnight, so
 the day's durations total 24 hours. Historical breakdowns do not use the
 current clock.
@@ -304,29 +308,18 @@ is counted through 24:00.
 
 ## 10. Implementation status
 
-The decisions in Sections 1–9 are the intended format contract, but the
-application does not yet implement all of them.
+The implementation follows the behavior defined in Sections 1–9.
 
-The existing parser, formatter, active-interval selection, and duration
-calculation are in `src/libs/hos-log-normalizer.ts`. Button-driven log
-updates are in `src/libs/hos-log-status-updater.ts`. At the time of this
-draft:
-
-- IndexedDB records have a separate date key; the parser does not yet parse
-  or emit a `YYYYMMDD` header as part of the log text.
-- The parser treats a standalone status as applying to the full day, rather
-  than interpreting it as a temporary status ending at the current time.
-- The existing unfinished-day breakdown projects remaining minutes as
-  Off-duty when the current status is not Off-duty, but the parser and
-  formatter do not yet implement the proposed date-dependent temporary-status
-  rules.
-- Timestamp-first entries are still accepted by the parser and are not yet
-  migrated to canonical status-first form.
-- New records are not yet guaranteed to store the date header in `logText`,
-  even though IndexedDB keys each record by date.
-- The app carries a prior status into a new day, but a canonical date header
-  and the full specified temporary-status behavior are not yet implemented.
-
-Update the parser, normalizer, storage/editor boundaries, status-button
-updater, tests, and UI documentation together to implement the agreed format
-and runtime breakdown behavior.
+- Parsing, date headers, legacy conversion, interval construction, and
+  elapsed-time breakdowns are implemented in
+  `src/libs/hos-log-normalizer.ts`.
+- Status-button updates are implemented in
+  `src/libs/hos-log-status-updater.ts`.
+- Daily records persist compact date-prefixed logs and an optional completion
+  timestamp in IndexedDB.
+- Loading legacy or headerless records normalizes and saves them in canonical
+  format. The indexed record date and an included header must match.
+- Today’s controls expose day completion and reopening; status buttons are
+  disabled while the day is marked complete.
+- Parser and status-updater tests cover date headers, temporary statuses,
+  elapsed and completed breakdowns, and migration from timestamp-first logs.

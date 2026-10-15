@@ -2,6 +2,7 @@ export type HosLogRecord = {
   date: string;
   logText: string;
   updatedAt: string;
+  completedAt?: string | null;
 };
 
 const DATABASE_NAME = "hosentinel";
@@ -12,7 +13,9 @@ let databasePromise: Promise<IDBDatabase> | undefined;
 
 function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
-    return Promise.reject(new Error("IndexedDB is not available in this browser."));
+    return Promise.reject(
+      new Error("IndexedDB is not available in this browser."),
+    );
   }
 
   if (!databasePromise) {
@@ -46,9 +49,14 @@ export async function getHosLog(date: string): Promise<HosLogRecord | null> {
     request.onsuccess = () =>
       resolve((request.result as HosLogRecord | undefined) ?? null);
     request.onerror = () =>
-      reject(request.error ?? new Error(`Failed to load the HOS log for ${date}.`));
+      reject(
+        request.error ?? new Error(`Failed to load the HOS log for ${date}.`),
+      );
     transaction.onabort = () =>
-      reject(transaction.error ?? new Error(`Failed to load the HOS log for ${date}.`));
+      reject(
+        transaction.error ??
+          new Error(`Failed to load the HOS log for ${date}.`),
+      );
   });
 }
 
@@ -72,9 +80,7 @@ export async function listHosLogs(): Promise<HosLogRecord[]> {
   });
 }
 
-export async function saveHosLog(
-  record: HosLogRecord,
-): Promise<void> {
+export async function saveHosLog(record: HosLogRecord): Promise<void> {
   const database = await openDatabase();
 
   await new Promise<void>((resolve, reject) => {
@@ -82,8 +88,14 @@ export async function saveHosLog(
     transaction.objectStore(LOG_STORE).put(record);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () =>
-      reject(transaction.error ?? new Error(`Failed to save the HOS log for ${record.date}.`));
+      reject(
+        transaction.error ??
+          new Error(`Failed to save the HOS log for ${record.date}.`),
+      );
     transaction.onabort = () =>
-      reject(transaction.error ?? new Error(`Failed to save the HOS log for ${record.date}.`));
+      reject(
+        transaction.error ??
+          new Error(`Failed to save the HOS log for ${record.date}.`),
+      );
   });
 }

@@ -8,10 +8,9 @@ import {
 } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import {
-  formatLogEntries,
+  formatDailyLog,
   getFinalStatus,
   getActiveDutyEntry,
-  getDurationWithOffDutyRemainder,
   parseLogs,
 } from "~/libs/hos-log-normalizer";
 import type { ParseResult } from "~/libs/hos-log-normalizer";
@@ -48,7 +47,28 @@ function getStartingStatus(date: string, records: HosLogRecord[]) {
   const previousRecord = records.find((record) => record.date < date);
   if (!previousRecord) return "O";
 
-  return getFinalStatus(parseLogs(previousRecord.logText).value);
+  return getFinalStatus(
+    parseLogs(previousRecord.logText, {
+      date: previousRecord.date,
+      completedAt: previousRecord.completedAt,
+    }).value,
+  );
+}
+
+function normalizeRecord(record: HosLogRecord, now: Date): HosLogRecord {
+  const parsed = parseLogs(record.logText, {
+    date: record.date,
+    now,
+    completedAt: record.completedAt,
+    expectedDate: record.date,
+  });
+  const logText = formatDailyLog(parsed.date, parsed.canonicalEntries).replace(
+    /\s/g,
+    "",
+  );
+  return logText === record.logText
+    ? record
+    : { ...record, logText, updatedAt: now.toISOString() };
 }
 
 export default component$(() => {
@@ -81,40 +101,66 @@ export default component$(() => {
   const isLoadingDay = useSignal(false);
   const isSaving = useSignal(false);
   const historyRequestId = useSignal(0);
+  const currentDate = useSignal(getLocalDateKey(new Date()));
   const currentMinute = useSignal(getMinuteOfDay(new Date()));
   const currentDutyEntry = useSignal<DutyEntry>();
 
-  const updateCurrentLogState = $((logText: string): ParseResult | null => {
+  const updateCurrentLogState = $(
+    (
+      logText: string,
+      date: string,
+      completedAt?: string | null,
+    ): ParseResult | null => {
+      try {
+        const parsed = parseLogs(logText, {
+          date,
+          now: new Date(),
+          completedAt,
+          expectedDate: date,
+        });
+        result.value = parsed.value;
+        calculatedDuration.value = parsed.duration;
+        error.value = parsed.error;
+        return parsed;
+      } catch (cause) {
+        result.value = [];
+        calculatedDuration.value = createEmptyStatusDuration();
+        error.value =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to parse this day's log.";
+        return null;
+      }
+    },
+  );
+
+  useTask$(({ track }) => {
+    const minute = track(() => currentMinute.value);
+    const date = track(() => selectedDate.value);
+    const logText = track(() => input.value);
+    const completedAt = track(() => loadedRecord.value?.completedAt ?? null);
     try {
-      const parsed = parseLogs(logText);
+      const parsed = parseLogs(logText, {
+        date,
+        now: new Date(),
+        completedAt,
+        expectedDate: date,
+      });
       result.value = parsed.value;
       calculatedDuration.value = parsed.duration;
       error.value = parsed.error;
-      return parsed;
+      currentDutyEntry.value = getActiveDutyEntry(parsed.value, minute);
+      todayBreakdownDuration.value = parsed.duration;
     } catch (cause) {
       result.value = [];
       calculatedDuration.value = createEmptyStatusDuration();
+      todayBreakdownDuration.value = createEmptyStatusDuration();
+      currentDutyEntry.value = undefined;
       error.value =
         cause instanceof Error
           ? cause.message
           : "Failed to parse this day's log.";
-      return null;
     }
-  });
-
-  useTask$(({ track }) => {
-    const entries = track(() => result.value);
-    const minute = track(() => currentMinute.value);
-    const date = track(() => selectedDate.value);
-    const activeEntry = getActiveDutyEntry(entries, minute);
-    currentDutyEntry.value = activeEntry;
-
-    todayBreakdownDuration.value =
-      date === getLocalDateKey(new Date()) &&
-      activeEntry &&
-      activeEntry?.status !== "OFF_DUTY"
-        ? getDurationWithOffDutyRemainder(entries, minute)
-        : calculatedDuration.value;
   });
 
   useTask$(({ cleanup }) => {
@@ -122,6 +168,7 @@ export default component$(() => {
 
     const updateCurrentMinute = () => {
       const now = new Date();
+      currentDate.value = getLocalDateKey(now);
       currentMinute.value = getMinuteOfDay(now);
     };
     updateCurrentMinute();
@@ -130,44 +177,59 @@ export default component$(() => {
   });
 
   const refreshSavedLogs = $(async () => {
-    const records = await listHosLogs();
+    const now = new Date();
+    const storedRecords = await listHosLogs();
+    const records = await Promise.all(
+      storedRecords.map(async (record) => {
+        const normalized = normalizeRecord(record, now);
+        if (normalized !== record) await saveHosLog(normalized);
+        return normalized;
+      }),
+    );
     savedLogs.value = records;
     return records;
   });
 
-  const persistLog = $(async (date: string, logText: string) => {
-    if (isSaving.value) return false;
+  const persistLog = $(
+    async (
+      date: string,
+      logText: string,
+      completedAt = loadedRecord.value?.completedAt ?? null,
+    ) => {
+      if (isSaving.value) return false;
 
-    storageError.value = null;
-    storageMessage.value = null;
-    const parsed = await updateCurrentLogState(logText);
-    if (!parsed) return false;
-    isSaving.value = true;
-    try {
-      const displayLog = formatLogEntries(parsed.value).join("\n");
-      const record: HosLogRecord = {
-        date,
-        logText: displayLog.replace(/\s/g, ""),
-        updatedAt: new Date().toISOString(),
-      };
-      await saveHosLog(record);
-      if (selectedDate.value === date) {
-        input.value = displayLog;
-        loadedRecord.value = { ...record, logText: displayLog };
-        storageMessage.value = "Log saved on this device.";
+      storageError.value = null;
+      storageMessage.value = null;
+      const parsed = await updateCurrentLogState(logText, date, completedAt);
+      if (!parsed) return false;
+      isSaving.value = true;
+      try {
+        const displayLog = formatDailyLog(parsed.date, parsed.canonicalEntries);
+        const record: HosLogRecord = {
+          date,
+          logText: displayLog.replace(/\s/g, ""),
+          updatedAt: new Date().toISOString(),
+          completedAt,
+        };
+        await saveHosLog(record);
+        if (selectedDate.value === date) {
+          input.value = displayLog;
+          loadedRecord.value = { ...record, logText: displayLog };
+          storageMessage.value = "Log saved on this device.";
+        }
+        await refreshSavedLogs();
+        return true;
+      } catch (cause) {
+        storageError.value =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to save this day's log.";
+        return false;
+      } finally {
+        isSaving.value = false;
       }
-      await refreshSavedLogs();
-      return true;
-    } catch (cause) {
-      storageError.value =
-        cause instanceof Error
-          ? cause.message
-          : "Failed to save this day's log.";
-      return false;
-    } finally {
-      isSaving.value = false;
-    }
-  });
+    },
+  );
 
   const openHistoricalDay = $(async (date: string) => {
     if (!date || date >= getLocalDateKey(new Date())) return;
@@ -190,19 +252,23 @@ export default component$(() => {
     isHistoryLoading.value = true;
 
     try {
-      const record = await getHosLog(date);
+      const records = await refreshSavedLogs();
       if (requestId !== historyRequestId.value) return;
-      const records = savedLogs.value.length
-        ? savedLogs.value
-        : await listHosLogs();
+      const record =
+        records.find((savedRecord) => savedRecord.date === date) ?? null;
       const carryStatus = record ? "O" : getStartingStatus(date, records);
-      const displayLog = record
-        ? formatLogEntries(parseLogs(record.logText).value).join("\n")
-        : carryStatus;
-      const parsed = parseLogs(displayLog);
+      const parsedRecord = record
+        ? parseLogs(record.logText, {
+            date,
+            now: new Date(),
+            completedAt: record.completedAt,
+            expectedDate: date,
+          })
+        : parseLogs(carryStatus, { date, now: new Date(), expectedDate: date });
+      const displayLog = formatDailyLog(date, parsedRecord.canonicalEntries);
       historyInput.value = displayLog;
       historyBaseline.value = displayLog;
-      historyDuration.value = parsed.duration;
+      historyDuration.value = parsedRecord.duration;
     } catch (cause) {
       if (requestId === historyRequestId.value) {
         historyStorageError.value =
@@ -232,9 +298,17 @@ export default component$(() => {
     historyError.value = null;
     historyStorageError.value = null;
     let parsed;
+    const existing = savedLogs.value.find(
+      (record) => record.date === historyDate.value,
+    );
 
     try {
-      parsed = parseLogs(historyInput.value);
+      parsed = parseLogs(historyInput.value, {
+        date: historyDate.value,
+        now: new Date(),
+        completedAt: existing?.completedAt,
+        expectedDate: historyDate.value,
+      });
     } catch (cause) {
       historyError.value =
         cause instanceof Error
@@ -246,11 +320,12 @@ export default component$(() => {
     historyDuration.value = parsed.duration;
     isHistorySaving.value = true;
     try {
-      const displayLog = formatLogEntries(parsed.value).join("\n");
+      const displayLog = formatDailyLog(parsed.date, parsed.canonicalEntries);
       await saveHosLog({
         date: historyDate.value,
         logText: displayLog.replace(/\s/g, ""),
         updatedAt: new Date().toISOString(),
+        completedAt: existing?.completedAt ?? null,
       });
       historyInput.value = displayLog;
       historyBaseline.value = displayLog;
@@ -281,7 +356,7 @@ export default component$(() => {
 
   const rollOverToToday = $(async () => {
     const today = getLocalDateKey(new Date());
-    if (selectedDate.value === today) return;
+    if (selectedDate.value === today || isLoadingDay.value) return;
 
     isLoadingDay.value = true;
     storageError.value = null;
@@ -289,16 +364,26 @@ export default component$(() => {
       const records = await refreshSavedLogs();
       const record = await getHosLog(today);
       const startingStatus = record ? "O" : getStartingStatus(today, records);
-      const displayLog = record
-        ? formatLogEntries(parseLogs(record.logText).value).join("\n")
-        : startingStatus;
+      const parsedRecord = record
+        ? parseLogs(record.logText, {
+            date: today,
+            now: new Date(),
+            completedAt: record.completedAt,
+            expectedDate: today,
+          })
+        : parseLogs(startingStatus, {
+            date: today,
+            now: new Date(),
+            expectedDate: today,
+          });
+      const displayLog = formatDailyLog(today, parsedRecord.canonicalEntries);
       selectedDate.value = today;
       loadedRecord.value = record ? { ...record, logText: displayLog } : null;
       input.value = displayLog;
       if (!record) {
         await persistLog(today, startingStatus);
       } else {
-        await updateCurrentLogState(displayLog);
+        await updateCurrentLogState(displayLog, today, record.completedAt);
       }
     } catch (cause) {
       storageError.value =
@@ -317,15 +402,25 @@ export default component$(() => {
         const records = await refreshSavedLogs();
         const record = await getHosLog(today);
         const carryStatus = record ? "O" : getStartingStatus(today, records);
-        const displayLog = record
-          ? formatLogEntries(parseLogs(record.logText).value).join("\n")
-          : carryStatus;
+        const parsedRecord = record
+          ? parseLogs(record.logText, {
+              date: today,
+              now: new Date(),
+              completedAt: record.completedAt,
+              expectedDate: today,
+            })
+          : parseLogs(carryStatus, {
+              date: today,
+              now: new Date(),
+              expectedDate: today,
+            });
+        const displayLog = formatDailyLog(today, parsedRecord.canonicalEntries);
         loadedRecord.value = record ? { ...record, logText: displayLog } : null;
         input.value = displayLog;
         if (!record) {
           await persistLog(today, carryStatus);
         } else {
-          await updateCurrentLogState(displayLog);
+          await updateCurrentLogState(displayLog, today, record.completedAt);
         }
       } catch (cause) {
         storageError.value =
@@ -338,8 +433,24 @@ export default component$(() => {
     }),
   );
 
+  useTask$(({ track }) => {
+    const today = track(() => currentDate.value);
+    const selected = track(() => selectedDate.value);
+    const ready = track(() => storageReady.value);
+    if (!isServer && ready && selected && selected !== today) {
+      rollOverToToday();
+    }
+  });
+
   const addStatusEntry = $(async (status: "O" | "D" | "N") => {
-    if (historyOpen.value || isSaving.value || isLoadingDay.value) return;
+    if (
+      historyOpen.value ||
+      isSaving.value ||
+      isLoadingDay.value ||
+      loadedRecord.value?.completedAt
+    ) {
+      return;
+    }
 
     const today = getLocalDateKey(new Date());
     if (selectedDate.value !== today) {
@@ -357,8 +468,18 @@ export default component$(() => {
 
   useTask$(({ track }) => {
     track(() => historyInput.value);
+    const date = track(() => historyDate.value);
+    const records = track(() => savedLogs.value);
+    const completedAt = records.find(
+      (record) => record.date === date,
+    )?.completedAt;
     try {
-      historyDuration.value = parseLogs(historyInput.value).duration;
+      historyDuration.value = parseLogs(historyInput.value, {
+        date,
+        now: new Date(),
+        completedAt,
+        expectedDate: date,
+      }).duration;
       historyError.value = null;
     } catch (cause) {
       historyError.value =
@@ -379,6 +500,7 @@ export default component$(() => {
         storageError={storageError.value}
         storageMessage={storageMessage.value}
         loadedRecord={loadedRecord.value}
+        isDayComplete={Boolean(loadedRecord.value?.completedAt)}
         historyOpen={historyOpen.value}
         storageReady={storageReady.value}
         isLoadingDay={isLoadingDay.value}
@@ -386,6 +508,17 @@ export default component$(() => {
         onOpenHistory={openHistory}
         onSaveLog={saveEditedLog}
         onAddStatus={addStatusEntry}
+        onSetDayComplete={$((completed: boolean) => {
+          if (
+            !selectedDate.value ||
+            selectedDate.value !== getLocalDateKey(new Date()) ||
+            isSaving.value
+          ) {
+            return Promise.resolve(false);
+          }
+          const completedAt = completed ? new Date().toISOString() : null;
+          return persistLog(selectedDate.value, input.value, completedAt);
+        })}
       />
 
       {historyOpen.value && (
