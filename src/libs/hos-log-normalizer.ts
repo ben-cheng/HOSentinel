@@ -119,6 +119,35 @@ export function getActiveDutyEntry(
   });
 }
 
+export function getDurationWithOffDutyRemainder(
+  entries: DutyEntry[],
+  minuteOfDay: number,
+): StatusDuration {
+  const duration = createEmptyStatusDuration();
+  const currentMinute = Math.max(0, Math.min(minuteOfDay, 1440));
+
+  for (const entry of entries) {
+    const [startHour, startMinute] = entry.startTime.split(":").map(Number);
+    const [endHour, endMinute] = entry.endTime.split(":").map(Number);
+    const start = startHour * 60 + startMinute;
+    const end = endHour * 60 + endMinute;
+    const elapsedEnd = Math.min(end, currentMinute);
+
+    if (elapsedEnd <= start) continue;
+
+    const status = (Object.keys(STATUS_MAP) as StatusKey[]).find(
+      (key) => STATUS_MAP[key] === entry.status,
+    );
+    if (!status) {
+      throw new Error(`Unable to find status key for "${entry.status}"`);
+    }
+    duration[status] += elapsedEnd - start;
+  }
+
+  duration.O += 1440 - currentMinute;
+  return duration;
+}
+
 export function formatLogEntries(entries: DutyEntry[]): string[] {
   return entries.map((entry) => {
     const status = (Object.keys(STATUS_MAP) as StatusKey[]).find(
@@ -201,11 +230,16 @@ export function parseLogs(input: string): ParseResult {
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
 
     duration[intervalStatus] += endMinutes - startMinutes;
-    result.push({
-      startTime,
-      endTime,
-      status: STATUS_MAP[intervalStatus],
-    });
+    const previousEntry = result[result.length - 1];
+    if (previousEntry?.status === STATUS_MAP[intervalStatus]) {
+      previousEntry.endTime = endTime;
+    } else {
+      result.push({
+        startTime,
+        endTime,
+        status: STATUS_MAP[intervalStatus],
+      });
+    }
   }
 
   return {

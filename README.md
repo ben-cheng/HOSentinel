@@ -67,6 +67,11 @@ A new date starts with the default Off Duty (`O`) entry. Logs are stored as a wh
 value in IndexedDB and formatted as one status/time entry per line while
 viewing or editing.
 
+For today's unfinished log, when the current duty status is not Off Duty, the
+duration breakdown counts that status only through the current time and treats
+the rest of the day as Off Duty. This projection affects the breakdown only;
+the saved log remains unchanged.
+
 When tracking today, status-button changes save automatically. If the app
 crosses midnight while open, the next status change starts today's record with
 the final status from the most recent saved day. When opening a new day, that

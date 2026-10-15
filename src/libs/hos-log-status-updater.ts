@@ -1,25 +1,33 @@
-import { isStatusKey } from "~/models/duty-status";
-import type { StatusKey } from "~/models/duty-status";
+import {
+  formatLogEntries,
+  getActiveDutyEntry,
+  parseLogs,
+} from "~/libs/hos-log-normalizer";
+import { STATUS_MAP } from "~/models/duty-status";
+import type { DutyStatus, StatusKey } from "~/models/duty-status";
 
-type TimedEntry = {
-  status: string;
-  time: string;
-  timeFirst: boolean;
-};
-
-function parseTimedEntry(line: string): TimedEntry | undefined {
-  const transition = line.match(/^(\d{1,2}:?\d{2})([A-Za-z])$/);
-  const intervalEnd = line.match(/^([A-Za-z])(\d{1,2}:?\d{2})$/);
-  const match = transition ?? intervalEnd;
-  if (!match) return undefined;
-
-  return transition
-    ? { time: match[1], status: match[2], timeFirst: true }
-    : { status: match[1], time: match[2], timeFirst: false };
+function getMinuteOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
 }
 
-function normalizeTime(time: string): string {
-  return time.replace(":", "").padStart(4, "0");
+function formatTime(minutes: number): string {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function mergeAdjacentEntries(
+  entries: Array<{ startTime: string; endTime: string; status: DutyStatus }>,
+) {
+  return entries.reduce<typeof entries>((merged, entry) => {
+    const previous = merged[merged.length - 1];
+    if (previous?.status === entry.status) {
+      previous.endTime = entry.endTime;
+    } else {
+      merged.push({ ...entry });
+    }
+    return merged;
+  }, []);
 }
 
 export function updateLogForStatus(
@@ -27,65 +35,37 @@ export function updateLogForStatus(
   status: StatusKey,
   now: Date,
 ): string {
-  const lines = input.split("\n");
-  let lastLineIndex = lines.length - 1;
-  while (lastLineIndex >= 0 && !lines[lastLineIndex].trim()) {
-    lastLineIndex--;
-  }
+  const entries = parseLogs(input).value;
+  const minute = getMinuteOfDay(now);
+  const activeEntry = getActiveDutyEntry(entries, minute);
+  const canonicalLog = formatLogEntries(entries).join("\n");
 
-  const lastLine = lines[lastLineIndex]?.replace(/\s+/g, "");
-  const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  if (!activeEntry || minute >= 1440) return canonicalLog;
 
-  if (lastLine?.length === 1) {
-    let previousTimedLineIndex = lastLineIndex - 1;
-    while (previousTimedLineIndex >= 0) {
-      const previous = lines[previousTimedLineIndex].replace(/\s+/g, "");
-      const entry = parseTimedEntry(previous);
-      if (entry && isStatusKey(entry.status.toUpperCase())) {
-        const previousTime = normalizeTime(entry.time);
-        if (previousTime === time && lastLine.toUpperCase() !== status) {
-          lines[lastLineIndex] = status;
-          return lines.join("\n");
-        }
+  const requestedStatus = STATUS_MAP[status];
+  const startMinutes =
+    Number(activeEntry.startTime.slice(0, 2)) * 60 +
+    Number(activeEntry.startTime.slice(3, 5));
+  if (activeEntry.status === requestedStatus) return canonicalLog;
 
-        if (lastLine.toUpperCase() === status) {
-          if (previousTime === time) return input;
-          lines[previousTimedLineIndex] = entry.timeFirst
-            ? `${time}${entry.status}`
-            : `${entry.status}${time}`;
-          return lines.join("\n");
-        }
-        break;
-      }
-      previousTimedLineIndex--;
-    }
+  const updatedEntries =
+    minute === startMinutes
+      ? entries.map((entry) =>
+          entry === activeEntry ? { ...entry, status: requestedStatus } : entry,
+        )
+      : [
+          ...entries.slice(0, entries.indexOf(activeEntry)),
+          {
+            ...activeEntry,
+            endTime: formatTime(minute),
+          },
+          {
+            ...activeEntry,
+            startTime: formatTime(minute),
+            status: requestedStatus,
+          },
+          ...entries.slice(entries.indexOf(activeEntry) + 1),
+        ];
 
-    if (lastLine.toUpperCase() === status) return input;
-  }
-
-  const previousEntry =
-    lastLine && lastLineIndex >= 0 ? parseTimedEntry(lastLine) : undefined;
-  if (
-    previousEntry &&
-    isStatusKey(previousEntry.status.toUpperCase())
-  ) {
-    const previousTime = normalizeTime(previousEntry.time);
-
-    if (previousTime === time) {
-      lines[lastLineIndex] = previousEntry.timeFirst
-        ? `${previousEntry.time}${status}`
-        : `${status}${previousEntry.time}`;
-      return lines.join("\n");
-    }
-
-    if (previousEntry.status.toUpperCase() === status) {
-      lines[lastLineIndex] = previousEntry.timeFirst
-        ? `${time}${status}`
-        : `${status}${time}`;
-      return lines.join("\n");
-    }
-  }
-
-  const separator = input.trim() ? "\n" : "";
-  return `${input.trimEnd()}${separator}${time}${status}`;
+  return formatLogEntries(mergeAdjacentEntries(updatedEntries)).join("\n");
 }

@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   formatLogEntries,
   getFinalStatus,
+  getDurationWithOffDutyRemainder,
   parseLogs,
 } from "~/libs/hos-log-normalizer";
 
@@ -69,6 +70,39 @@ test("formats readable lines that compact into one saved log value", () => {
   expect(parseLogs(displayLines.join("")).duration).toEqual(
     parseLogs("O\n0630D\n0645N\n0900O").duration,
   );
+});
+
+test("merges adjacent intervals with the same status", () => {
+  const parsed = parseLogs("O1931\nN1942\nO1946\nO");
+
+  expect(parsed.value).toEqual([
+    { startTime: "00:00", endTime: "19:31", status: "OFF_DUTY" },
+    { startTime: "19:31", endTime: "19:42", status: "ON_DUTY_NOT_DRIVING" },
+    { startTime: "19:42", endTime: "24:00", status: "OFF_DUTY" },
+  ]);
+  expect(formatLogEntries(parsed.value)).toEqual(["O1931", "N1942", "O"]);
+});
+
+test("projects the unfinished remainder of a driving day as off duty", () => {
+  const entries = parseLogs("O0600\nD1200\nN1800").value;
+
+  expect(getDurationWithOffDutyRemainder(entries, 10 * 60)).toEqual({
+    O: 1200,
+    S: 0,
+    D: 240,
+    N: 0,
+  });
+});
+
+test("projects all remaining hours as off duty at the start of the day", () => {
+  expect(
+    getDurationWithOffDutyRemainder(parseLogs("D").value, 0),
+  ).toEqual({
+    O: 1440,
+    S: 0,
+    D: 0,
+    N: 0,
+  });
 });
 
 test("gets the status to carry into the next day", () => {

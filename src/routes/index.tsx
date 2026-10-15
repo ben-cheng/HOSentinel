@@ -11,6 +11,7 @@ import {
   formatLogEntries,
   getFinalStatus,
   getActiveDutyEntry,
+  getDurationWithOffDutyRemainder,
   parseLogs,
 } from "~/libs/hos-log-normalizer";
 import type { ParseResult } from "~/libs/hos-log-normalizer";
@@ -57,6 +58,9 @@ export default component$(() => {
   const calculatedDuration = useSignal<StatusDuration>(
     createEmptyStatusDuration(),
   );
+  const todayBreakdownDuration = useSignal<StatusDuration>(
+    createEmptyStatusDuration(),
+  );
   const error = useSignal<string | null>(null);
   const storageError = useSignal<string | null>(null);
   const storageMessage = useSignal<string | null>(null);
@@ -101,7 +105,16 @@ export default component$(() => {
   useTask$(({ track }) => {
     const entries = track(() => result.value);
     const minute = track(() => currentMinute.value);
-    currentDutyEntry.value = getActiveDutyEntry(entries, minute);
+    const date = track(() => selectedDate.value);
+    const activeEntry = getActiveDutyEntry(entries, minute);
+    currentDutyEntry.value = activeEntry;
+
+    todayBreakdownDuration.value =
+      date === getLocalDateKey(new Date()) &&
+      activeEntry &&
+      activeEntry?.status !== "OFF_DUTY"
+        ? getDurationWithOffDutyRemainder(entries, minute)
+        : calculatedDuration.value;
   });
 
   useTask$(({ cleanup }) => {
@@ -361,7 +374,7 @@ export default component$(() => {
         date={selectedDate.value}
         input={input.value}
         currentDutyEntry={currentDutyEntry.value}
-        calculatedDuration={calculatedDuration.value}
+        calculatedDuration={todayBreakdownDuration.value}
         error={error.value}
         storageError={storageError.value}
         storageMessage={storageMessage.value}
