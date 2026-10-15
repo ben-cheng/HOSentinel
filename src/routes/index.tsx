@@ -8,10 +8,13 @@ import {
 } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import {
+  endsAtEndOfDay,
+  finalizeCompletedLogEntries,
   formatDailyLog,
   getFinalStatus,
   getActiveDutyEntry,
   parseLogs,
+  reopenCompletedLogEntries,
 } from "~/libs/hos-log-normalizer";
 import type { ParseResult } from "~/libs/hos-log-normalizer";
 import { updateLogForStatus } from "~/libs/hos-log-status-updater";
@@ -62,10 +65,10 @@ function normalizeRecord(record: HosLogRecord, now: Date): HosLogRecord {
     completedAt: record.completedAt,
     expectedDate: record.date,
   });
-  const logText = formatDailyLog(parsed.date, parsed.canonicalEntries).replace(
-    /\s/g,
-    "",
-  );
+  const entries = record.completedAt
+    ? finalizeCompletedLogEntries(parsed.canonicalEntries, record.completedAt)
+    : parsed.canonicalEntries;
+  const logText = formatDailyLog(parsed.date, entries).replace(/\s/g, "");
   return logText === record.logText
     ? record
     : { ...record, logText, updatedAt: now.toISOString() };
@@ -94,7 +97,6 @@ export default component$(() => {
   );
   const historyError = useSignal<string | null>(null);
   const historyStorageError = useSignal<string | null>(null);
-  const historyBaseline = useSignal("");
   const isHistoryLoading = useSignal(false);
   const isHistorySaving = useSignal(false);
   const storageReady = useSignal(false);
@@ -194,17 +196,45 @@ export default component$(() => {
     async (
       date: string,
       logText: string,
-      completedAt = loadedRecord.value?.completedAt ?? null,
+      completedAt: string | null = null,
+      previousCompletedAt: string | null = null,
     ) => {
       if (isSaving.value) return false;
 
       storageError.value = null;
       storageMessage.value = null;
-      const parsed = await updateCurrentLogState(logText, date, completedAt);
-      if (!parsed) return false;
+      if (date !== getLocalDateKey(new Date())) {
+        storageError.value = "Past-day logs are read-only.";
+        return false;
+      }
       isSaving.value = true;
       try {
-        const displayLog = formatDailyLog(parsed.date, parsed.canonicalEntries);
+        let parsed: ParseResult;
+        try {
+          parsed = parseLogs(logText, {
+            date,
+            now: new Date(),
+            completedAt,
+            expectedDate: date,
+          });
+          error.value = null;
+        } catch (cause) {
+          error.value =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to parse this day's log.";
+          return false;
+        }
+
+        const entries = completedAt
+          ? finalizeCompletedLogEntries(parsed.canonicalEntries, completedAt)
+          : previousCompletedAt
+            ? reopenCompletedLogEntries(
+                parsed.canonicalEntries,
+                previousCompletedAt,
+              )
+            : parsed.canonicalEntries;
+        const displayLog = formatDailyLog(parsed.date, entries);
         const record: HosLogRecord = {
           date,
           logText: displayLog.replace(/\s/g, ""),
@@ -215,6 +245,7 @@ export default component$(() => {
         if (selectedDate.value === date) {
           input.value = displayLog;
           loadedRecord.value = { ...record, logText: displayLog };
+          await updateCurrentLogState(displayLog, date, completedAt);
           storageMessage.value = "Log saved on this device.";
         }
         await refreshSavedLogs();
@@ -234,13 +265,6 @@ export default component$(() => {
   const openHistoricalDay = $(async (date: string) => {
     if (!date || date >= getLocalDateKey(new Date())) return;
     if (historyOpen.value && historyDate.value === date) return;
-    if (
-      historyOpen.value &&
-      historyInput.value !== historyBaseline.value &&
-      !window.confirm("Discard your unsaved changes and open another day?")
-    ) {
-      return;
-    }
 
     const requestId = ++historyRequestId.value;
     historyOpen.value = true;
@@ -248,7 +272,6 @@ export default component$(() => {
     historyError.value = null;
     historyStorageError.value = null;
     historyInput.value = "O";
-    historyBaseline.value = "";
     isHistoryLoading.value = true;
 
     try {
@@ -267,7 +290,6 @@ export default component$(() => {
         : parseLogs(carryStatus, { date, now: new Date(), expectedDate: date });
       const displayLog = formatDailyLog(date, parsedRecord.canonicalEntries);
       historyInput.value = displayLog;
-      historyBaseline.value = displayLog;
       historyDuration.value = parsedRecord.duration;
     } catch (cause) {
       if (requestId === historyRequestId.value) {
@@ -289,21 +311,20 @@ export default component$(() => {
     historyError.value = null;
     historyStorageError.value = null;
     historyInput.value = "";
-    historyBaseline.value = "";
   });
 
-  const saveHistoricalDay = $(async () => {
-    if (!historyDate.value || isHistorySaving.value) return;
+  const saveHistoricalDay = $(async (logText: string) => {
+    if (!historyDate.value || isHistorySaving.value) return false;
 
     historyError.value = null;
     historyStorageError.value = null;
-    let parsed;
     const existing = savedLogs.value.find(
       (record) => record.date === historyDate.value,
     );
 
+    let parsed: ParseResult;
     try {
-      parsed = parseLogs(historyInput.value, {
+      parsed = parseLogs(logText, {
         date: historyDate.value,
         now: new Date(),
         completedAt: existing?.completedAt,
@@ -314,13 +335,18 @@ export default component$(() => {
         cause instanceof Error
           ? cause.message
           : "Failed to parse this day's log.";
-      return;
+      return false;
     }
 
-    historyDuration.value = parsed.duration;
     isHistorySaving.value = true;
     try {
-      const displayLog = formatDailyLog(parsed.date, parsed.canonicalEntries);
+      const entries = existing?.completedAt
+        ? finalizeCompletedLogEntries(
+            parsed.canonicalEntries,
+            existing.completedAt,
+          )
+        : parsed.canonicalEntries;
+      const displayLog = formatDailyLog(parsed.date, entries);
       await saveHosLog({
         date: historyDate.value,
         logText: displayLog.replace(/\s/g, ""),
@@ -328,14 +354,20 @@ export default component$(() => {
         completedAt: existing?.completedAt ?? null,
       });
       historyInput.value = displayLog;
-      historyBaseline.value = displayLog;
+      historyDuration.value = parseLogs(displayLog, {
+        date: historyDate.value,
+        now: new Date(),
+        completedAt: existing?.completedAt,
+        expectedDate: historyDate.value,
+      }).duration;
       await refreshSavedLogs();
-      discardHistoricalChanges();
+      return true;
     } catch (cause) {
       historyStorageError.value =
         cause instanceof Error
           ? cause.message
           : "Failed to save this day's log.";
+      return false;
     } finally {
       isHistorySaving.value = false;
     }
@@ -343,7 +375,30 @@ export default component$(() => {
 
   const saveEditedLog = $(async (logText: string) => {
     if (!selectedDate.value) return false;
-    return persistLog(selectedDate.value, logText);
+    const previousCompletedAt =
+      loadedRecord.value?.date === selectedDate.value
+        ? (loadedRecord.value.completedAt ?? null)
+        : null;
+    let completedAt = previousCompletedAt;
+    if (selectedDate.value === getLocalDateKey(new Date())) {
+      let parsed: ParseResult;
+      try {
+        parsed = parseLogs(logText, {
+          date: selectedDate.value,
+          expectedDate: selectedDate.value,
+        });
+      } catch (cause) {
+        error.value =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to parse this day's log.";
+        return false;
+      }
+      if (endsAtEndOfDay(parsed.canonicalEntries)) {
+        completedAt ??= new Date().toISOString();
+      }
+    }
+    return persistLog(selectedDate.value, logText, completedAt, completedAt);
   });
 
   const openHistory = $(() => {
@@ -462,7 +517,16 @@ export default component$(() => {
     if (updatedLog === input.value) return;
     input.value = updatedLog;
     if (selectedDate.value === today) {
-      await persistLog(selectedDate.value, updatedLog);
+      const completedAt =
+        loadedRecord.value?.date === selectedDate.value
+          ? (loadedRecord.value.completedAt ?? null)
+          : null;
+      await persistLog(
+        selectedDate.value,
+        updatedLog,
+        completedAt,
+        completedAt,
+      );
     }
   });
 
@@ -517,7 +581,16 @@ export default component$(() => {
             return Promise.resolve(false);
           }
           const completedAt = completed ? new Date().toISOString() : null;
-          return persistLog(selectedDate.value, input.value, completedAt);
+          const previousCompletedAt =
+            loadedRecord.value?.date === selectedDate.value
+              ? (loadedRecord.value.completedAt ?? null)
+              : null;
+          return persistLog(
+            selectedDate.value,
+            input.value,
+            completedAt,
+            previousCompletedAt,
+          );
         })}
       />
 
@@ -526,7 +599,6 @@ export default component$(() => {
           date={historyDate.value}
           today={getPreviousLocalDateKey(getLocalDateKey(new Date()))}
           input={historyInput.value}
-          baseline={historyBaseline.value}
           duration={historyDuration.value}
           error={historyError.value}
           storageError={historyStorageError.value}
@@ -534,11 +606,11 @@ export default component$(() => {
           isLoading={isHistoryLoading.value}
           isSaving={isHistorySaving.value}
           onSelectDay={openHistoricalDay}
-          onInput={$((event: Event) => {
-            historyInput.value = (event.target as HTMLTextAreaElement).value;
+          onInput={$((logText: string) => {
+            historyInput.value = logText;
           })}
-          onDiscard={discardHistoricalChanges}
           onSave={saveHistoricalDay}
+          onDiscard={discardHistoricalChanges}
         />
       )}
     </div>

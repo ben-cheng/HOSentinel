@@ -1,10 +1,13 @@
 import { expect, test } from "vitest";
 import {
+  endsAtEndOfDay,
+  finalizeCompletedLogEntries,
   formatDailyLog,
   getActiveDutyEntry,
   getElapsedDuration,
   getFinalStatus,
   parseLogs,
+  reopenCompletedLogEntries,
 } from "~/libs/hos-log-normalizer";
 
 const now = new Date(2026, 9, 14, 10, 0);
@@ -131,6 +134,45 @@ test("a completed historical day retains its Off-duty remainder", () => {
   });
 
   expect(parsed.duration).toEqual({ O: 840, S: 0, D: 600, N: 0 });
+});
+
+test("finalizes a completed temporary status and closes the log at 2400", () => {
+  expect(
+    finalizeCompletedLogEntries(
+      ["O0600", "D"],
+      "2026-10-14T10:00:00",
+    ),
+  ).toEqual(["O0600", "D1000", "O2400"]);
+});
+
+test("recognizes a final timed 2400 entry as the end of the day", () => {
+  expect(endsAtEndOfDay(["O0600", "D2400"])).toBe(true);
+  expect(endsAtEndOfDay(["O0600", "D"])).toBe(false);
+  expect(endsAtEndOfDay(["O2400", "D"])).toBe(false);
+});
+
+test("finalizes an already-ended status with an Off-duty 2400 boundary", () => {
+  expect(
+    finalizeCompletedLogEntries(
+      ["O0600", "D0900"],
+      "2026-10-14T10:00:00",
+    ),
+  ).toEqual(["O0600", "D0900", "O2400"]);
+});
+
+test("reopening removes the generated 2400 closure and restores the temporary status", () => {
+  expect(
+    reopenCompletedLogEntries(
+      ["O0600", "D1000", "O2400"],
+      "2026-10-14T10:00:00",
+    ),
+  ).toEqual(["O0600", "D"]);
+});
+
+test("reopening a log whose final duty status ends at 2400 makes it temporary", () => {
+  expect(
+    reopenCompletedLogEntries(["O0600", "D2400"], "2026-10-14T10:00:00"),
+  ).toEqual(["O0600", "D"]);
 });
 
 test("gets the status to carry into the next day", () => {

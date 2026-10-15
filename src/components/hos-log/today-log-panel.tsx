@@ -68,32 +68,49 @@ interface TodayLogPanelProps {
 }
 
 export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
-  const isEditingLog = useSignal(false);
+  const isLogDialogOpen = useSignal(false);
   const editedLog = useSignal("");
+  const saveError = useSignal<string | null>(null);
   const isDisabled =
     !props.storageReady || props.isLoadingDay || props.isSaving;
-  const isStatusDisabled = isDisabled || props.isDayComplete;
+  const isReadOnly =
+    props.isDayComplete || props.date < getLocalDateKey(new Date());
+  const isStatusDisabled = isDisabled || isReadOnly;
 
-  const openLogEditor = $(() => {
+  const openLogDialog = $(() => {
     editedLog.value = props.input;
-    isEditingLog.value = true;
+    saveError.value = null;
+    isLogDialogOpen.value = true;
   });
 
-  const discardLogEdits = $(() => {
-    isEditingLog.value = false;
+  const closeLogDialog = $(() => {
+    saveError.value = null;
+    isLogDialogOpen.value = false;
   });
 
   const saveLogEdits = $(async () => {
-    const saved = await props.onSaveLog(editedLog.value);
-    if (saved) isEditingLog.value = false;
+    saveError.value = null;
+    try {
+      const saved = await props.onSaveLog(editedLog.value);
+      if (saved) {
+        isLogDialogOpen.value = false;
+      } else if (!props.error && !props.storageError) {
+        saveError.value = "The log could not be saved. Please try again.";
+      }
+    } catch (cause) {
+      saveError.value =
+        cause instanceof Error
+          ? `The log could not be saved: ${cause.message}`
+          : "The log could not be saved. Please try again.";
+    }
   });
 
   return (
     <>
       <div
         class="w-full max-w-3xl space-y-6 rounded-2xl bg-white p-6 shadow-lg"
-        aria-hidden={props.historyOpen || isEditingLog.value}
-        inert={props.historyOpen || isEditingLog.value}
+        aria-hidden={props.historyOpen || isLogDialogOpen.value}
+        inert={props.historyOpen || isLogDialogOpen.value}
       >
         <div>
           <h1 class="text-2xl font-bold text-gray-800">HOS Log Parser</h1>
@@ -171,10 +188,10 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           <button
             type="button"
             class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
-            disabled={isStatusDisabled}
-            onClick$={openLogEditor}
+            disabled={isDisabled}
+            onClick$={openLogDialog}
           >
-            Edit log
+            {isReadOnly ? "View log" : "Edit log"}
           </button>
         </div>
 
@@ -239,7 +256,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
         </div>
       </div>
 
-      {isEditingLog.value && (
+      {isLogDialogOpen.value && (
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <section
             class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"
@@ -251,7 +268,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               id="today-log-dialog-title"
               class="text-lg font-semibold text-gray-800"
             >
-              Edit today’s log
+              {isReadOnly ? "View log" : "Edit log"}
             </h2>
             <label
               for="hos-log"
@@ -262,34 +279,50 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             <textarea
               id="hos-log"
               class="h-56 w-full rounded-lg border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              disabled={isDisabled}
+              readOnly={isReadOnly}
               value={editedLog.value}
               onInput$={(event) => {
                 editedLog.value = (event.target as HTMLTextAreaElement).value;
+                saveError.value = null;
               }}
             />
-            {(props.error || props.storageError) && (
+            {(props.error || props.storageError || saveError.value) && (
               <p role="alert" class="mt-2 text-sm text-red-600">
-                {props.error || props.storageError}
+                {props.error ||
+                  (props.storageError
+                    ? `Local storage error: ${props.storageError}`
+                    : saveError.value)}
               </p>
             )}
             <footer class="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                disabled={props.isSaving}
-                onClick$={discardLogEdits}
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isDisabled || editedLog.value === props.input}
-                onClick$={saveLogEdits}
-              >
-                {props.isSaving ? "Saving..." : "Save"}
-              </button>
+              {isReadOnly ? (
+                <button
+                  type="button"
+                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick$={closeLogDialog}
+                >
+                  Close
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    disabled={props.isSaving}
+                    onClick$={closeLogDialog}
+                  >
+                    Discard
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isDisabled || editedLog.value === props.input}
+                    onClick$={saveLogEdits}
+                  >
+                    {props.isSaving ? "Saving..." : "Save"}
+                  </button>
+                </>
+              )}
             </footer>
           </section>
         </div>

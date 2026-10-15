@@ -257,6 +257,76 @@ export function formatDailyLog(date: string, entries: string[]): string {
   return [toDateHeader(toDateKey(date)), ...entries].join("\n");
 }
 
+export function endsAtEndOfDay(entries: string[]): boolean {
+  return /^[A-Z]2400$/.test(entries.at(-1) ?? "");
+}
+
+export function finalizeCompletedLogEntries(
+  entries: string[],
+  completedAt: string,
+): string[] {
+  const completionTime = new Date(completedAt);
+  if (Number.isNaN(completionTime.getTime())) {
+    throw new Error(`Invalid day completion timestamp: "${completedAt}"`);
+  }
+
+  const finalized = [...entries];
+  const completionMinute =
+    completionTime.getHours() * 60 + completionTime.getMinutes();
+  const lastEntry = finalized.at(-1);
+  const temporaryStatus = lastEntry?.match(/^([A-Z])$/)?.[1];
+  if (temporaryStatus) {
+    const previousTimedEntry = finalized.at(-2)?.match(/^([A-Z])(\d{4})$/);
+    const previousMinute = previousTimedEntry
+      ? Number(previousTimedEntry[2].slice(0, 2)) * 60 +
+        Number(previousTimedEntry[2].slice(2))
+      : 0;
+
+    if (completionMinute > previousMinute) {
+      finalized[finalized.length - 1] =
+        `${temporaryStatus}${formatTime(completionMinute).replace(":", "")}`;
+    } else {
+      finalized.pop();
+    }
+  }
+
+  const finalTimedEntry = finalized.at(-1)?.match(/^([A-Z])(\d{4})$/);
+  if (finalTimedEntry?.[2] === "2400") return finalized;
+  if (finalTimedEntry?.[1] === "O") {
+    finalized[finalized.length - 1] = "O2400";
+  } else {
+    finalized.push("O2400");
+  }
+  return finalized;
+}
+
+export function reopenCompletedLogEntries(
+  entries: string[],
+  completedAt: string,
+): string[] {
+  const completionTime = new Date(completedAt);
+  if (Number.isNaN(completionTime.getTime())) {
+    throw new Error(`Invalid day completion timestamp: "${completedAt}"`);
+  }
+
+  const reopened = [...entries];
+  const endOfDayEntry = reopened.at(-1)?.match(/^([A-Z])2400$/);
+  if (endOfDayEntry) {
+    reopened.pop();
+    if (endOfDayEntry[1] !== "O") reopened.push(endOfDayEntry[1]);
+  }
+
+  const completionTimeToken = formatTime(
+    completionTime.getHours() * 60 + completionTime.getMinutes(),
+  ).replace(":", "");
+  const finalTimedEntry = reopened.at(-1)?.match(/^([A-Z])(\d{4})$/);
+  if (finalTimedEntry?.[2] === completionTimeToken) {
+    reopened[reopened.length - 1] = finalTimedEntry[1];
+  }
+
+  return reopened.length ? reopened : ["O"];
+}
+
 export function getActiveDutyEntry(
   entries: DutyEntry[],
   minuteOfDay: number,

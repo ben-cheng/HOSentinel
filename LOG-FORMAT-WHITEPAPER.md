@@ -239,8 +239,7 @@ status extends to `2400`.
    represents the active status; it has no end time until the next change or
    end of day.
 6. **Save according to view.** Today's button changes save automatically.
-   Historical changes are saved only through the historical editor's Save
-   action.
+   Log edits for today and past days are saved from their detail dialogs.
 7. **Do nothing when the selected status is already active.** Do not add a
    boundary or change the existing start time. To correct a start time, use
    **Edit log**.
@@ -295,6 +294,20 @@ total to 24 hours.
 The completion action records the local completion time with the daily record.
 Reopening a completed day removes that completion time and restores the
 elapsed-time breakdown.
+
+When a day is completed, any temporary status is written as a timed entry
+ending at the completion minute, followed by an explicit Off-duty `O2400`
+boundary. If there is no temporary status, the completed log is still closed
+with `O2400` unless its final timed entry already ends at `2400`. Reopening
+removes this generated closure and restores the temporary status when its end
+matches the saved completion minute.
+
+The Today log dialog is editable until the day is complete. A completed Today
+log opens read-only; it can be edited again after reopening the day. Past-day
+logs remain editable so missing or incorrect entries can be patched, including
+records whose day was marked complete. Saving a Today log whose final timed
+entry ends at `2400` automatically marks the day complete and records the
+completion timestamp.
 
 For a past dated log, a final temporary status extends through midnight, so
 the day's durations total 24 hours. Historical breakdowns do not use the
