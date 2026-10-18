@@ -147,42 +147,6 @@ export default component$(() => {
   const currentMinute = useSignal(getMinuteOfDay(new Date()));
   const currentDutyEntry = useSignal<DutyEntry>();
 
-  const updateCurrentLogState = $(
-    (
-      logText: string,
-      date: string,
-      completedAt?: string | null,
-    ): ParseResult | null => {
-      try {
-        const parsed = parseLogs(logText, {
-          date,
-          now: new Date(),
-          completedAt,
-          expectedDate: date,
-        });
-        if (date) {
-          dailyLog.value = toDailyLog(
-            parsed.date,
-            parsed.canonicalEntries,
-            completedAt ?? null,
-          );
-        }
-        result.value = parsed.value;
-        calculatedDuration.value = parsed.duration;
-        error.value = parsed.error;
-        return parsed;
-      } catch (cause) {
-        result.value = [];
-        calculatedDuration.value = createEmptyStatusDuration();
-        error.value =
-          cause instanceof Error
-            ? cause.message
-            : "Failed to parse this day's log.";
-        return null;
-      }
-    },
-  );
-
   useTask$(({ track }) => {
     const minute = track(() => currentMinute.value);
     const date = track(() => selectedDate.value);
@@ -252,6 +216,7 @@ export default component$(() => {
       logText: string,
       completedAt: string | null = null,
       previousCompletedAt: string | null = null,
+      completeAtEndOfDay = false,
     ) => {
       if (isSaving.value) return false;
 
@@ -280,8 +245,15 @@ export default component$(() => {
           return false;
         }
 
-        const entries = completedAt
-          ? finalizeCompletedLogEntries(parsed.canonicalEntries, completedAt)
+        const savedCompletedAt =
+          completeAtEndOfDay && endsAtEndOfDay(parsed.canonicalEntries)
+            ? (completedAt ?? new Date().toISOString())
+            : completedAt;
+        const entries = savedCompletedAt
+          ? finalizeCompletedLogEntries(
+              parsed.canonicalEntries,
+              savedCompletedAt,
+            )
           : previousCompletedAt
             ? reopenCompletedLogEntries(
                 parsed.canonicalEntries,
@@ -293,13 +265,12 @@ export default component$(() => {
           date,
           logText: displayLog.replace(/\s/g, ""),
           updatedAt: new Date().toISOString(),
-          completedAt,
+          completedAt: savedCompletedAt,
         };
         await saveHosLog(record);
         if (selectedDate.value === date) {
           input.value = displayLog;
           loadedRecord.value = { ...record, logText: displayLog };
-          await updateCurrentLogState(displayLog, date, completedAt);
           storageMessage.value = "Log saved on this device.";
         }
         await refreshSavedLogs();
@@ -433,26 +404,14 @@ export default component$(() => {
       loadedRecord.value?.date === selectedDate.value
         ? (loadedRecord.value.completedAt ?? null)
         : null;
-    let completedAt = previousCompletedAt;
-    if (selectedDate.value === getLocalDateKey(new Date())) {
-      let parsed: ParseResult;
-      try {
-        parsed = parseLogs(logText, {
-          date: selectedDate.value,
-          expectedDate: selectedDate.value,
-        });
-      } catch (cause) {
-        error.value =
-          cause instanceof Error
-            ? cause.message
-            : "Failed to parse this day's log.";
-        return false;
-      }
-      if (endsAtEndOfDay(parsed.canonicalEntries)) {
-        completedAt ??= new Date().toISOString();
-      }
-    }
-    return persistLog(selectedDate.value, logText, completedAt, completedAt);
+    const isToday = selectedDate.value === getLocalDateKey(new Date());
+    return persistLog(
+      selectedDate.value,
+      logText,
+      previousCompletedAt,
+      previousCompletedAt,
+      isToday,
+    );
   });
 
   const openHistory = $(() => {
@@ -491,8 +450,6 @@ export default component$(() => {
       input.value = displayLog;
       if (!record) {
         await persistLog(today, startingStatus);
-      } else {
-        await updateCurrentLogState(displayLog, today, record.completedAt);
       }
     } catch (cause) {
       storageError.value =
@@ -528,8 +485,6 @@ export default component$(() => {
         input.value = displayLog;
         if (!record) {
           await persistLog(today, carryStatus);
-        } else {
-          await updateCurrentLogState(displayLog, today, record.completedAt);
         }
       } catch (cause) {
         storageError.value =
