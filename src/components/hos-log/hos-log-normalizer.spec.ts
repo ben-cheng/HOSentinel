@@ -8,7 +8,7 @@ import {
   getFinalStatus,
   parseLogs,
   reopenCompletedLogEntries,
-} from "~/libs/hos-log-normalizer";
+} from "./hos-log-normalizer";
 
 const now = new Date(2026, 9, 14, 10, 0);
 const today = "2026-10-14";

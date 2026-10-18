@@ -17,12 +17,12 @@ and calculating daily time totals by duty status.
 ## Important files
 
 - `src/routes/index.tsx`: Main log-entry UI, status buttons, and duration display.
-- `src/libs/hos-log-normalizer.ts`: Input parsing, interval construction, and
+- `src/components/hos-log/hos-log-normalizer.ts`: Input parsing, interval construction, and
   duration calculation.
-- `src/libs/hos-log-storage.ts`: IndexedDB storage for daily log records.
+- `src/components/hos-log/hos-log-storage.ts`: IndexedDB storage for daily log records.
 - `src/models/duty-status.ts`: Status codes, labels, and duration types.
 - `src/models/duty-entry.ts`: Parsed duty interval type.
-- `src/components/hos-log-normalizer/hos-log-normalizer.spec.ts`: Duration
+- `src/components/hos-log/hos-log-normalizer.spec.ts`: Duration
   regression test.
 
 ## Log format and calculation rules

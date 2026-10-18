@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { getActiveDutyEntry, parseLogs } from "~/libs/hos-log-normalizer";
+import {
+  getActiveDutyEntry,
+  parseLogs,
+} from "~/components/hos-log/hos-log-normalizer";
 import type { DutyEntry } from "~/models/duty-entry";
 
 const entries: DutyEntry[] = [

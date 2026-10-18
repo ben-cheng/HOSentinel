@@ -325,9 +325,9 @@ The implementation follows the behavior defined in Sections 1–9.
 
 - Parsing, date headers, legacy conversion, interval construction, and
   elapsed-time breakdowns are implemented in
-  `src/libs/hos-log-normalizer.ts`.
+  `src/components/hos-log/hos-log-normalizer.ts`.
 - Status-button updates are implemented in
-  `src/libs/hos-log-status-updater.ts`.
+  `src/components/hos-log/hos-log-status-updater.ts`.
 - Daily records persist compact date-prefixed logs and an optional completion
   timestamp in IndexedDB.
 - Loading legacy or headerless records normalizes and saves them in canonical

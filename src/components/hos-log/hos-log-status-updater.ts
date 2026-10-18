@@ -2,7 +2,7 @@ import {
   formatDailyLog,
   getActiveDutyEntry,
   parseLogs,
-} from "~/libs/hos-log-normalizer";
+} from "~/components/hos-log/hos-log-normalizer";
 import type { DutyEntry } from "~/models/duty-entry";
 import type { StatusKey } from "~/models/duty-status";
 

@@ -5,8 +5,15 @@ import {
   useTask$,
   useOnWindow,
   isServer,
+  useContext,
 } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
+import { HosContext } from "~/components/hos-log/hours-of-service";
+import type {
+  DailyLog,
+  DutyStatus as DailyDutyStatus,
+  LogEntry as DailyLogEntry,
+} from "~/components/hos-log/hours-of-service";
 import {
   endsAtEndOfDay,
   finalizeCompletedLogEntries,
@@ -15,18 +22,56 @@ import {
   getActiveDutyEntry,
   parseLogs,
   reopenCompletedLogEntries,
-} from "~/libs/hos-log-normalizer";
-import type { ParseResult } from "~/libs/hos-log-normalizer";
-import { updateLogForStatus } from "~/libs/hos-log-status-updater";
-import { getHosLog, listHosLogs, saveHosLog } from "~/libs/hos-log-storage";
-import type { HosLogRecord } from "~/libs/hos-log-storage";
+} from "~/components/hos-log/hos-log-normalizer";
+import type { ParseResult } from "~/components/hos-log/hos-log-normalizer";
+import { updateLogForStatus } from "~/components/hos-log/hos-log-status-updater";
+import {
+  getHosLog,
+  listHosLogs,
+  saveHosLog,
+} from "~/components/hos-log/hos-log-storage";
+import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
 import { DutyEntry } from "~/models/duty-entry";
 import {
   createEmptyStatusDuration,
   StatusDuration,
+  StatusKey,
 } from "~/models/duty-status";
 import { HistoryDrawer } from "~/components/hos-log/history-drawer";
 import { TodayLogPanel } from "~/components/hos-log/today-log-panel";
+import { isStatusKey } from "~/models/duty-status";
+
+const DAILY_STATUS_BY_KEY: Record<StatusKey, DailyDutyStatus> = {
+  O: "offDuty",
+  S: "sleeper",
+  D: "driving",
+  N: "onDutyNotDriving",
+};
+
+function toDailyLog(
+  date: string,
+  canonicalEntries: string[],
+  completedAt: string | null,
+): DailyLog {
+  const entries: DailyLogEntry[] = canonicalEntries.map((entry) => {
+    const match = entry.match(/^([OSDN])(\d{4})?$/);
+    if (!match) throw new Error(`Invalid canonical log entry: "${entry}"`);
+
+    const statusKey = match[1];
+    if (!isStatusKey(statusKey)) {
+      throw new Error(`Invalid duty status in log entry: "${entry}"`);
+    }
+    const time = match[2];
+    return {
+      status: DAILY_STATUS_BY_KEY[statusKey],
+      endMinute: time
+        ? Number(time.slice(0, 2)) * 60 + Number(time.slice(2))
+        : null,
+    };
+  });
+
+  return { date, entries, completedAt };
+}
 
 function getLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -75,6 +120,7 @@ function normalizeRecord(record: HosLogRecord, now: Date): HosLogRecord {
 }
 
 export default component$(() => {
+  const dailyLog = useContext(HosContext);
   const input = useSignal("O");
   const selectedDate = useSignal("");
   const result = useSignal<DutyEntry[]>([]);
@@ -120,6 +166,13 @@ export default component$(() => {
           completedAt,
           expectedDate: date,
         });
+        if (date) {
+          dailyLog.value = toDailyLog(
+            parsed.date,
+            parsed.canonicalEntries,
+            completedAt ?? null,
+          );
+        }
         result.value = parsed.value;
         calculatedDuration.value = parsed.duration;
         error.value = parsed.error;
@@ -148,6 +201,13 @@ export default component$(() => {
         completedAt,
         expectedDate: date,
       });
+      if (date) {
+        dailyLog.value = toDailyLog(
+          parsed.date,
+          parsed.canonicalEntries,
+          completedAt,
+        );
+      }
       result.value = parsed.value;
       calculatedDuration.value = parsed.duration;
       error.value = parsed.error;

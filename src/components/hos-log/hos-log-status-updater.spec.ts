@@ -1,6 +1,9 @@
 import { expect, test } from "vitest";
-import { updateLogForStatus } from "~/libs/hos-log-status-updater";
-import { getActiveDutyEntry, parseLogs } from "~/libs/hos-log-normalizer";
+import { updateLogForStatus } from "~/components/hos-log/hos-log-status-updater";
+import {
+  getActiveDutyEntry,
+  parseLogs,
+} from "~/components/hos-log/hos-log-normalizer";
 
 const at = (hour: number, minute: number) =>
   new Date(2026, 9, 14, hour, minute);
