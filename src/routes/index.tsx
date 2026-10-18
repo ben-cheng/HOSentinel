@@ -554,7 +554,8 @@ export default component$(() => {
     const saving = track(() => isSaving.value);
     const loading = track(() => isLoadingDay.value);
     const queueLength = track(() => pendingStatusEntries.value.length);
-    if (!saving && !loading && queueLength > 0) {
+    const processing = track(() => isProcessingStatusEntries.value);
+    if (!saving && !loading && !processing && queueLength > 0) {
       processPendingStatusEntries();
     }
   });
