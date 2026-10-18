@@ -16,6 +16,7 @@ import type {
 import type {
   DutyEntry,
   StatusDuration,
+  StatusKey,
 } from "~/components/hos-log/hours-of-service";
 import {
   createEmptyStatusDuration,
@@ -146,6 +147,8 @@ export default component$(() => {
   const currentDate = useSignal(getLocalDateKey(new Date()));
   const currentMinute = useSignal(getMinuteOfDay(new Date()));
   const currentDutyEntry = useSignal<DutyEntry>();
+  const pendingStatusEntries = useSignal<StatusKey[]>([]);
+  const isProcessingStatusEntries = useSignal(false);
 
   useTask$(({ track }) => {
     const minute = track(() => currentMinute.value);
@@ -414,6 +417,47 @@ export default component$(() => {
     );
   });
 
+  const processPendingStatusEntries = $(async () => {
+    if (isProcessingStatusEntries.value) return;
+    isProcessingStatusEntries.value = true;
+    try {
+      while (pendingStatusEntries.value.length > 0) {
+        const status = pendingStatusEntries.value[0];
+
+        if (historyOpen.value || loadedRecord.value?.completedAt) {
+          pendingStatusEntries.value = pendingStatusEntries.value.slice(1);
+          continue;
+        }
+        if (isLoadingDay.value || isSaving.value) break;
+
+        pendingStatusEntries.value = pendingStatusEntries.value.slice(1);
+
+        const today = getLocalDateKey(new Date());
+        if (selectedDate.value !== today) {
+          await rollOverToToday();
+          if (storageError.value || selectedDate.value !== today) continue;
+        }
+
+        const updatedLog = updateLogForStatus(input.value, status, new Date());
+        if (updatedLog === input.value) continue;
+        input.value = updatedLog;
+
+        const completedAt =
+          loadedRecord.value?.date === selectedDate.value
+            ? (loadedRecord.value.completedAt ?? null)
+            : null;
+        await persistLog(
+          selectedDate.value,
+          updatedLog,
+          completedAt,
+          completedAt,
+        );
+      }
+    } finally {
+      isProcessingStatusEntries.value = false;
+    }
+  });
+
   const openHistory = $(() => {
     const yesterday = getPreviousLocalDateKey(getLocalDateKey(new Date()));
     const mostRecentPastLog = savedLogs.value.find(
@@ -506,37 +550,21 @@ export default component$(() => {
     }
   });
 
+  useTask$(({ track }) => {
+    const saving = track(() => isSaving.value);
+    const loading = track(() => isLoadingDay.value);
+    const queueLength = track(() => pendingStatusEntries.value.length);
+    if (!saving && !loading && queueLength > 0) {
+      processPendingStatusEntries();
+    }
+  });
+
   const addStatusEntry = $(async (status: "O" | "D" | "N") => {
-    if (
-      historyOpen.value ||
-      isSaving.value ||
-      isLoadingDay.value ||
-      loadedRecord.value?.completedAt
-    ) {
+    if (historyOpen.value || loadedRecord.value?.completedAt) {
       return;
     }
-
-    const today = getLocalDateKey(new Date());
-    if (selectedDate.value !== today) {
-      await rollOverToToday();
-      if (storageError.value) return;
-    }
-
-    const updatedLog = updateLogForStatus(input.value, status, new Date());
-    if (updatedLog === input.value) return;
-    input.value = updatedLog;
-    if (selectedDate.value === today) {
-      const completedAt =
-        loadedRecord.value?.date === selectedDate.value
-          ? (loadedRecord.value.completedAt ?? null)
-          : null;
-      await persistLog(
-        selectedDate.value,
-        updatedLog,
-        completedAt,
-        completedAt,
-      );
-    }
+    pendingStatusEntries.value = [...pendingStatusEntries.value, status];
+    await processPendingStatusEntries();
   });
 
   useTask$(({ track }) => {
