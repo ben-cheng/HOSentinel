@@ -57,16 +57,16 @@ export const DurationBreakdown = component$(
         >
           Breakdown by status
         </h3>
-        <div class="grid grid-cols-4 gap-3">
+        <div class="flex flex-wrap gap-3">
           {(Object.keys(STATUS_LABEL) as StatusKey[]).map((status) => (
             <div
               key={status}
-              class="flex min-h-16 flex-col justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm sm:flex-row sm:items-center"
+              class="flex min-h-16 min-w-32 basis-2/5 flex-1 flex-col justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm"
             >
               <div class="block w-full text-xs font-medium text-slate-500">
                 {STATUS_LABEL[status]}
               </div>
-              <div class="block w-full text-lg font-bold tabular-nums text-slate-900">
+              <div class="w-fit whitespace-nowrap text-lg font-bold tabular-nums text-slate-900">
                 {Number((roundedCents[status] / 100).toFixed(2))} h
               </div>
             </div>
