@@ -1,10 +1,13 @@
-import type { DutyEntry } from "~/models/duty-entry";
 import {
   createEmptyStatusDuration,
   isStatusKey,
   STATUS_MAP,
-} from "~/models/duty-status";
-import type { StatusDuration, StatusKey } from "~/models/duty-status";
+} from "~/components/hos-log/hours-of-service";
+import type {
+  DutyEntry,
+  StatusDuration,
+  StatusKey,
+} from "~/components/hos-log/hours-of-service";
 
 type ParsedToken = {
   time: string | null;

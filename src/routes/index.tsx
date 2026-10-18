@@ -11,8 +11,16 @@ import type { DocumentHead } from "@builder.io/qwik-city";
 import { HosContext } from "~/components/hos-log/hours-of-service";
 import type {
   DailyLog,
-  DutyStatus as DailyDutyStatus,
   LogEntry as DailyLogEntry,
+} from "~/components/hos-log/hours-of-service";
+import type {
+  DutyEntry,
+  StatusDuration,
+} from "~/components/hos-log/hours-of-service";
+import {
+  createEmptyStatusDuration,
+  isStatusKey,
+  STATUS_MAP,
 } from "~/components/hos-log/hours-of-service";
 import {
   endsAtEndOfDay,
@@ -31,22 +39,8 @@ import {
   saveHosLog,
 } from "~/components/hos-log/hos-log-storage";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
-import { DutyEntry } from "~/models/duty-entry";
-import {
-  createEmptyStatusDuration,
-  StatusDuration,
-  StatusKey,
-} from "~/models/duty-status";
 import { HistoryDrawer } from "~/components/hos-log/history-drawer";
 import { TodayLogPanel } from "~/components/hos-log/today-log-panel";
-import { isStatusKey } from "~/models/duty-status";
-
-const DAILY_STATUS_BY_KEY: Record<StatusKey, DailyDutyStatus> = {
-  O: "offDuty",
-  S: "sleeper",
-  D: "driving",
-  N: "onDutyNotDriving",
-};
 
 function toDailyLog(
   date: string,
@@ -63,7 +57,7 @@ function toDailyLog(
     }
     const time = match[2];
     return {
-      status: DAILY_STATUS_BY_KEY[statusKey],
+      status: STATUS_MAP[statusKey],
       endMinute: time
         ? Number(time.slice(0, 2)) * 60 + Number(time.slice(2))
         : null,

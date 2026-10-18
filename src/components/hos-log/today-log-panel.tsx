@@ -2,10 +2,12 @@ import { component$, $, useSignal } from "@builder.io/qwik";
 import type { QRL } from "@builder.io/qwik";
 import { DurationBreakdown } from "./duration-breakdown";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
-import type { DutyEntry } from "~/models/duty-entry";
-import type { DutyStatus } from "~/models/duty-status";
-import type { StatusDuration } from "~/models/duty-status";
-import type { StatusKey } from "~/models/duty-status";
+import type {
+  DutyEntry,
+  DutyStatus,
+  StatusDuration,
+  StatusKey,
+} from "~/components/hos-log/hours-of-service";
 
 const DUTY_STATUS_KEY: Partial<Record<DutyStatus, StatusKey>> = {
   OFF_DUTY: "O",

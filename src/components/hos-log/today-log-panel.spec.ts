@@ -3,7 +3,7 @@ import {
   getActiveDutyEntry,
   parseLogs,
 } from "~/components/hos-log/hos-log-normalizer";
-import type { DutyEntry } from "~/models/duty-entry";
+import type { DutyEntry } from "~/components/hos-log/hours-of-service";
 
 const entries: DutyEntry[] = [
   {

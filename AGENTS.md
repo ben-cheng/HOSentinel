@@ -20,8 +20,8 @@ and calculating daily time totals by duty status.
 - `src/components/hos-log/hos-log-normalizer.ts`: Input parsing, interval construction, and
   duration calculation.
 - `src/components/hos-log/hos-log-storage.ts`: IndexedDB storage for daily log records.
-- `src/models/duty-status.ts`: Status codes, labels, and duration types.
-- `src/models/duty-entry.ts`: Parsed duty interval type.
+- `src/components/hos-log/hours-of-service.ts`: HOS status codes, labels,
+  durations, and daily log types.
 - `src/components/hos-log/hos-log-normalizer.spec.ts`: Duration
   regression test.
 

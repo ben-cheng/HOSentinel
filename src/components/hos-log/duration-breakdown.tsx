@@ -1,10 +1,9 @@
 import { component$ } from "@builder.io/qwik";
-import {
-  STATUS_LABEL,
-  STATUS_MAP,
+import { STATUS_LABEL, STATUS_MAP } from "./hours-of-service";
+import type {
   StatusDuration,
   StatusKey,
-} from "~/models/duty-status";
+} from "~/components/hos-log/hours-of-service";
 
 interface DurationBreakdownProps {
   duration: StatusDuration;

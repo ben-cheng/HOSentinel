@@ -3,8 +3,10 @@ import {
   getActiveDutyEntry,
   parseLogs,
 } from "~/components/hos-log/hos-log-normalizer";
-import type { DutyEntry } from "~/models/duty-entry";
-import type { StatusKey } from "~/models/duty-status";
+import type {
+  DutyEntry,
+  StatusKey,
+} from "~/components/hos-log/hours-of-service";
 
 function getMinuteOfDay(date: Date): number {
   return date.getHours() * 60 + date.getMinutes();

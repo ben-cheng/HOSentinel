@@ -2,7 +2,7 @@ import { component$, $, useSignal } from "@builder.io/qwik";
 import type { QRL } from "@builder.io/qwik";
 import { DurationBreakdown } from "./duration-breakdown";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
-import type { StatusDuration } from "~/models/duty-status";
+import type { StatusDuration } from "~/components/hos-log/hours-of-service";
 
 interface HistoryDrawerProps {
   date: string;
