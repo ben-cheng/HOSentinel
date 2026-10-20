@@ -13,12 +13,13 @@
 import {
   renderToStream,
   type RenderToStreamOptions,
-} from "@builder.io/qwik/server";
+} from "@qwik.dev/core/server";
 import Root from "./root";
 
 export default function (opts: RenderToStreamOptions) {
   return renderToStream(<Root />, {
     ...opts,
+    base: `${import.meta.env.BASE_URL}build/`,
     // Use container attributes to set attributes on the html tag.
     containerAttributes: {
       lang: "en-us",

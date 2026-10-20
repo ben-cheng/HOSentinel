@@ -5,8 +5,8 @@ import {
   useContextProvider,
   useOnWindow,
   useSignal,
-} from "@builder.io/qwik";
-import { QwikCityProvider, RouterOutlet } from "@builder.io/qwik-city";
+} from "@qwik.dev/core";
+import { QwikRouterProvider, RouterOutlet } from "@qwik.dev/router";
 import { RouterHead } from "./components/router-head/router-head";
 import { HosContext } from "./components/hos-log/hours-of-service";
 import type { DailyLog } from "./components/hos-log/hours-of-service";
@@ -54,7 +54,7 @@ export default component$(() => {
    */
 
   return (
-    <QwikCityProvider>
+    <QwikRouterProvider>
       <head>
         <meta charset="utf-8" />
         <meta name="theme-color" content="#111827" />
@@ -75,6 +75,6 @@ export default component$(() => {
       <body lang="en">
         <RouterOutlet />
       </body>
-    </QwikCityProvider>
+    </QwikRouterProvider>
   );
 });

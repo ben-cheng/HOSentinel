@@ -1,5 +1,5 @@
-import { component$, $, useComputed$, useSignal } from "@builder.io/qwik";
-import type { QRL } from "@builder.io/qwik";
+import { component$, $, useComputed$, useSignal } from "@qwik.dev/core";
+import type { QRL } from "@qwik.dev/core";
 import { DurationBreakdown } from "./duration-breakdown";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
 import type { StatusDuration } from "~/components/hos-log/hours-of-service";

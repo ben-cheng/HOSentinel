@@ -1,5 +1,5 @@
-import { component$, useComputed$ } from "@builder.io/qwik";
-import type { QRL } from "@builder.io/qwik";
+import { component$, useComputed$ } from "@qwik.dev/core";
+import type { QRL } from "@qwik.dev/core";
 import type { StatusKey } from "~/components/hos-log/hours-of-service";
 
 export type SelectableStatusKey = "O" | "D" | "N";

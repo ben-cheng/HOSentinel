@@ -3,13 +3,18 @@
  * When building, the adapter config is used which loads this file and extends it.
  */
 import { defineConfig, type UserConfig } from "vite";
-import { qwikVite } from "@builder.io/qwik/optimizer";
-import { qwikCity } from "@builder.io/qwik-city/vite";
-import tsconfigPaths from "vite-tsconfig-paths";
-import pkg from "./package.json";
+import { qwikVite } from "@qwik.dev/core/optimizer";
+import { qwikRouter } from "@qwik.dev/router/vite";
+import { createRequire } from "node:module";
 import tailwindcss from "@tailwindcss/vite";
 
+const pkg = createRequire(import.meta.url)("./package.json");
 type PkgDep = Record<string, string>;
+// Keep route matching at `/` while Vite prefixes assets for GitHub Pages.
+type QwikRouterOptionsWithBaseUrl = Parameters<typeof qwikRouter>[0] & {
+  baseUrl: string;
+};
+const qwikRouterOptions: QwikRouterOptionsWithBaseUrl = { baseUrl: "/" };
 const { dependencies = {}, devDependencies = {} } = pkg as any as {
   dependencies: PkgDep;
   devDependencies: PkgDep;
@@ -22,13 +27,15 @@ errorOnDuplicatesPkgDeps(devDependencies, dependencies);
  */
 export default defineConfig(({ command, mode }): UserConfig => {
   return {
-    base: "/HOSentinel/",
+    base: command === "serve" && mode === "ssr" ? "/" : "/HOSentinel/",
     plugins: [
       tailwindcss(),
-      qwikCity(),
+      qwikRouter(qwikRouterOptions),
       qwikVite(),
-      tsconfigPaths({ root: "." })
     ],
+    resolve: {
+      tsconfigPaths: true,
+    },
     // This tells Vite which dependencies to pre-build in dev mode.
     optimizeDeps: {
       // Put problematic deps that break bundling here, mostly those with binaries.
@@ -92,7 +99,7 @@ function errorOnDuplicatesPkgDeps(
   );
 
   // any errors for missing "qwik-city-plan"
-  // [PLUGIN_ERROR]: Invalid module "@qwik-city-plan" is not a valid package
+  // [PLUGIN_ERROR]: Invalid module "@qwik-router-config" is not a valid package
   msg = `Move qwik packages ${qwikPkg.join(", ")} to devDependencies`;
 
   if (qwikPkg.length > 0) {

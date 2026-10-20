@@ -1,5 +1,5 @@
-import { component$, $, useComputed$, useSignal } from "@builder.io/qwik";
-import type { QRL } from "@builder.io/qwik";
+import { component$, $, useComputed$, useSignal } from "@qwik.dev/core";
+import type { QRL } from "@qwik.dev/core";
 import { DurationBreakdown } from "./duration-breakdown";
 import { STATUS_OPTIONS, StatusPanel } from "./status-panel";
 import type { SelectableStatusKey } from "./status-panel";

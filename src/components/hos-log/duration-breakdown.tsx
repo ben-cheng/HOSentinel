@@ -1,4 +1,4 @@
-import { component$, useComputed$ } from "@builder.io/qwik";
+import { component$, useComputed$ } from "@qwik.dev/core";
 import { STATUS_LABEL, STATUS_MAP } from "./hours-of-service";
 import type {
   StatusDuration,

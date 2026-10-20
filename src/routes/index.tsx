@@ -6,8 +6,8 @@ import {
   useOnWindow,
   isServer,
   useContext,
-} from "@builder.io/qwik";
-import type { DocumentHead } from "@builder.io/qwik-city";
+} from "@qwik.dev/core";
+import type { DocumentHead } from "@qwik.dev/router";
 import { HosContext } from "~/components/hos-log/hours-of-service";
 import type {
   DailyLog,
