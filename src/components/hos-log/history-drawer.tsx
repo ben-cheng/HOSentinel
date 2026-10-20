@@ -1,4 +1,4 @@
-import { component$, $, useSignal } from "@builder.io/qwik";
+import { component$, $, useComputed$, useSignal } from "@builder.io/qwik";
 import type { QRL } from "@builder.io/qwik";
 import { DurationBreakdown } from "./duration-breakdown";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
@@ -25,10 +25,10 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
   const editedLog = useSignal("");
   const baselineLog = useSignal("");
   const saveError = useSignal<string | null>(null);
-  const historicalLogs = props.savedLogs.filter(
-    (record) => record.date < props.today,
+  const historicalLogs = useComputed$(() =>
+    props.savedLogs.filter((record) => record.date < props.today),
   );
-  const isBusy = props.isLoading || props.isSaving;
+  const isBusy = useComputed$(() => props.isLoading || props.isSaving);
 
   const openLogDialog = $(() => {
     editedLog.value = props.input;
@@ -102,7 +102,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
               max={props.today}
               class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
               value={props.date}
-              disabled={isBusy}
+              disabled={isBusy.value}
               onInput$={(event) => {
                 const date = (event.target as HTMLInputElement).value;
                 if (date) props.onSelectDay(date);
@@ -114,13 +114,13 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
             <h3 class="mb-2 text-sm font-semibold text-gray-700">
               Saved historical days
             </h3>
-            {historicalLogs.length > 0 ? (
+            {historicalLogs.value.length > 0 ? (
               <div class="flex flex-wrap gap-2">
-                {historicalLogs.map((record) => (
+                {historicalLogs.value.map((record) => (
                   <button
                     key={record.date}
                     type="button"
-                    disabled={isBusy}
+                    disabled={isBusy.value}
                     class={`rounded-full border px-3 py-1.5 text-sm transition ${
                       props.date === record.date
                         ? "border-blue-200 bg-blue-50 font-semibold text-blue-800"
@@ -146,7 +146,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
           <button
             type="button"
             class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-            disabled={isBusy || !props.date}
+            disabled={isBusy.value || !props.date}
             onClick$={openLogDialog}
           >
             Edit log

@@ -1,4 +1,4 @@
-import { component$ } from "@builder.io/qwik";
+import { component$, useComputed$ } from "@builder.io/qwik";
 import { STATUS_LABEL, STATUS_MAP } from "./hours-of-service";
 import type {
   StatusDuration,
@@ -34,44 +34,44 @@ export function getRoundedDurationCents(
   ) as Record<StatusKey, number>;
 }
 
-export const DurationBreakdown = component$(
-  ({ duration, variant = "card" }: DurationBreakdownProps) => {
-    const isCard = variant === "card";
-    const roundedCents = getRoundedDurationCents(duration);
+export const DurationBreakdown = component$((props: DurationBreakdownProps) => {
+  const isCard = useComputed$(() => (props.variant ?? "card") === "card");
+  const roundedCents = useComputed$(() =>
+    getRoundedDurationCents(props.duration),
+  );
 
-    return (
-      <section
+  return (
+    <section
+      class={
+        isCard.value
+          ? "space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
+          : "rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
+      }
+    >
+      <h3
         class={
-          isCard
-            ? "space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
-            : "rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
+          isCard.value
+            ? "text-sm font-semibold text-slate-800"
+            : "mb-4 text-sm font-semibold text-slate-800"
         }
       >
-        <h3
-          class={
-            isCard
-              ? "text-sm font-semibold text-slate-800"
-              : "mb-4 text-sm font-semibold text-slate-800"
-          }
-        >
-          Breakdown by status
-        </h3>
-        <div class="flex flex-wrap gap-3">
-          {(Object.keys(STATUS_LABEL) as StatusKey[]).map((status) => (
-            <div
-              key={status}
-              class="flex min-h-16 min-w-32 basis-2/5 flex-1 flex-col justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm"
-            >
-              <div class="block w-full text-xs font-medium text-slate-500">
-                {STATUS_LABEL[status]}
-              </div>
-              <div class="w-fit whitespace-nowrap text-lg font-bold tabular-nums text-slate-900">
-                {Number((roundedCents[status] / 100).toFixed(2))} h
-              </div>
+        Breakdown by status
+      </h3>
+      <div class="flex flex-wrap gap-3">
+        {(Object.keys(STATUS_LABEL) as StatusKey[]).map((status) => (
+          <div
+            key={status}
+            class="flex min-h-16 min-w-32 basis-2/5 flex-1 flex-col justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-3 shadow-sm"
+          >
+            <div class="block w-full text-xs font-medium text-slate-500">
+              {STATUS_LABEL[status]}
             </div>
-          ))}
-        </div>
-      </section>
-    );
-  },
-);
+            <div class="w-fit whitespace-nowrap text-lg font-bold tabular-nums text-slate-900">
+              {Number((roundedCents.value[status] / 100).toFixed(2))} h
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+});

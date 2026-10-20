@@ -1,4 +1,4 @@
-import { component$, $, useSignal } from "@builder.io/qwik";
+import { component$, $, useComputed$, useSignal } from "@builder.io/qwik";
 import type { QRL } from "@builder.io/qwik";
 import { DurationBreakdown } from "./duration-breakdown";
 import { STATUS_OPTIONS, StatusPanel } from "./status-panel";
@@ -6,8 +6,20 @@ import type { SelectableStatusKey } from "./status-panel";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
 import type {
   DutyEntry,
+  DutyStatus,
+  StatusKey,
   StatusDuration,
 } from "~/components/hos-log/hours-of-service";
+
+const DUTY_STATUS_KEY: Partial<Record<DutyStatus, StatusKey>> = {
+  OFF_DUTY: "O",
+  DRIVING: "D",
+  ON_DUTY_NOT_DRIVING: "N",
+};
+
+function getCurrentStatus(entry?: DutyEntry): StatusKey | undefined {
+  return entry ? DUTY_STATUS_KEY[entry.status] : undefined;
+}
 
 function getLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -37,34 +49,21 @@ interface TodayLogPanelProps {
 }
 
 export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
-  const {
-    date,
-    input,
-    currentDutyEntry,
-    calculatedDuration,
-    error,
-    storageError,
-    storageMessage,
-    loadedRecord,
-    isDayComplete,
-    historyOpen,
-    storageReady,
-    isLoadingDay,
-    isSaving,
-    onOpenHistory,
-    onSaveLog,
-    onAddStatus,
-    onSetDayComplete,
-  } = props;
   const isLogDialogOpen = useSignal(false);
   const editedLog = useSignal("");
   const saveError = useSignal<string | null>(null);
-  const isDisabled = !storageReady || isLoadingDay || isSaving;
-  const isReadOnly = isDayComplete || date < getLocalDateKey(new Date());
-  const isStatusDisabled = isDisabled || isReadOnly;
+  const isDisabled = useComputed$(
+    () => !props.storageReady || props.isLoadingDay || props.isSaving,
+  );
+  const isReadOnly = useComputed$(
+    () => props.isDayComplete || props.date < getLocalDateKey(new Date()),
+  );
+  const isStatusDisabled = useComputed$(
+    () => isDisabled.value || isReadOnly.value,
+  );
 
   const openLogDialog = $(() => {
-    editedLog.value = input;
+    editedLog.value = props.input;
     saveError.value = null;
     isLogDialogOpen.value = true;
   });
@@ -77,10 +76,10 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
   const saveLogEdits = $(async () => {
     saveError.value = null;
     try {
-      const saved = await onSaveLog(editedLog.value);
+      const saved = await props.onSaveLog(editedLog.value);
       if (saved) {
         isLogDialogOpen.value = false;
-      } else if (!error && !storageError) {
+      } else if (!props.error && !props.storageError) {
         saveError.value = "The log could not be saved. Please try again.";
       }
     } catch (cause) {
@@ -95,8 +94,8 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
     <>
       <div
         class="mx-auto w-full max-w-4xl space-y-8 rounded-3xl border border-white/80 bg-white p-5 shadow-xl shadow-slate-300/50 sm:p-8"
-        aria-hidden={historyOpen || isLogDialogOpen.value}
-        inert={historyOpen || isLogDialogOpen.value}
+        aria-hidden={props.historyOpen || isLogDialogOpen.value}
+        inert={props.historyOpen || isLogDialogOpen.value}
       >
         <div class="border-b border-slate-100 pb-6">
           <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">
@@ -117,45 +116,48 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               Selected day
             </p>
             <h2 class="mt-1 text-lg font-semibold text-slate-900">
-              {new Date(`${date}T00:00:00`).toLocaleDateString()}
+              {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
             </h2>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            {loadedRecord && input !== loadedRecord.logText && (
-              <span class="text-sm font-medium text-amber-700">
-                Unsaved changes
-              </span>
-            )}
+            {props.loadedRecord &&
+              props.input !== props.loadedRecord.logText && (
+                <span class="text-sm font-medium text-amber-700">
+                  Unsaved changes
+                </span>
+              )}
             <button
               type="button"
               class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isDisabled}
-              onClick$={onOpenHistory}
+              disabled={isDisabled.value}
+              onClick$={props.onOpenHistory}
             >
               View past logs
             </button>
             <button
               type="button"
               class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:opacity-50"
-              disabled={isDisabled || date !== getLocalDateKey(new Date())}
-              onClick$={() => onSetDayComplete(!isDayComplete)}
+              disabled={
+                isDisabled.value || props.date !== getLocalDateKey(new Date())
+              }
+              onClick$={() => props.onSetDayComplete(!props.isDayComplete)}
             >
-              {isDayComplete ? "Reopen day" : "Mark day complete"}
+              {props.isDayComplete ? "Reopen day" : "Mark day complete"}
             </button>
             <p class="w-full text-xs leading-5 text-slate-500">
-              {isDayComplete
+              {props.isDayComplete
                 ? "Remaining time is counted as Off-duty."
                 : "The breakdown shows elapsed time until you mark the day complete."}
             </p>
           </div>
-          {storageError && (
+          {props.storageError && (
             <p role="alert" class="w-full text-sm text-red-600">
-              Local storage error: {storageError}
+              Local storage error: {props.storageError}
             </p>
           )}
-          {storageMessage && (
+          {props.storageMessage && (
             <p role="status" class="w-full text-sm text-green-700">
-              {storageMessage}
+              {props.storageMessage}
             </p>
           )}
         </section>
@@ -173,23 +175,24 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             <button
               type="button"
               class="text-sm font-semibold text-blue-700 transition hover:text-blue-900"
-              disabled={isDisabled}
+              disabled={isDisabled.value}
               onClick$={openLogDialog}
             >
-              {isReadOnly ? "View log" : "Edit log"}
+              {isReadOnly.value ? "View log" : "Edit log"}
             </button>
           </div>
 
-          {!historyOpen && (
+          {!props.historyOpen && (
             <div class="grid grid-cols-3 gap-2 sm:gap-3">
               {STATUS_OPTIONS.map(({ status, label }) => (
                 <StatusPanel
                   key={status}
                   status={status}
                   label={label}
-                  currentDutyEntry={currentDutyEntry}
-                  disabled={isStatusDisabled}
-                  onAddStatus={onAddStatus}
+                  currentStatus={getCurrentStatus(props.currentDutyEntry)}
+                  currentSince={props.currentDutyEntry?.startTime}
+                  disabled={isStatusDisabled.value}
+                  onAddStatus={props.onAddStatus}
                 />
               ))}
             </div>
@@ -197,14 +200,16 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
         </section>
 
         <div class="flex min-h-6 items-center justify-between">
-          {error && <span class="text-sm text-red-500">{error}</span>}
+          {props.error && (
+            <span class="text-sm text-red-500">{props.error}</span>
+          )}
         </div>
 
         <div>
           <h2 class="mb-3 text-base font-semibold text-slate-900">
             Today’s breakdown
           </h2>
-          <DurationBreakdown duration={calculatedDuration} />
+          <DurationBreakdown duration={props.calculatedDuration} />
         </div>
       </div>
 
@@ -220,7 +225,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               id="today-log-dialog-title"
               class="text-xl font-bold tracking-tight text-slate-900"
             >
-              {isReadOnly ? "View log" : "Edit log"}
+              {isReadOnly.value ? "View log" : "Edit log"}
             </h2>
             <label
               for="hos-log"
@@ -231,26 +236,26 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             <textarea
               id="hos-log"
               class="h-64 w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 font-mono text-sm leading-6 text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
-              readOnly={isReadOnly}
+              readOnly={isReadOnly.value}
               value={editedLog.value}
               onInput$={(event) => {
                 editedLog.value = (event.target as HTMLTextAreaElement).value;
                 saveError.value = null;
               }}
             />
-            {(error || storageError || saveError.value) && (
+            {(props.error || props.storageError || saveError.value) && (
               <p
                 role="alert"
                 class="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
               >
-                {error ||
-                  (storageError
-                    ? `Local storage error: ${storageError}`
+                {props.error ||
+                  (props.storageError
+                    ? `Local storage error: ${props.storageError}`
                     : saveError.value)}
               </p>
             )}
             <footer class="mt-5 flex justify-end gap-3">
-              {isReadOnly ? (
+              {isReadOnly.value ? (
                 <button
                   type="button"
                   class="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
@@ -263,7 +268,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
                   <button
                     type="button"
                     class="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                    disabled={isSaving}
+                    disabled={props.isSaving}
                     onClick$={closeLogDialog}
                   >
                     Discard
@@ -271,10 +276,12 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
                   <button
                     type="button"
                     class="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isDisabled || editedLog.value === input}
+                    disabled={
+                      isDisabled.value || editedLog.value === props.input
+                    }
                     onClick$={saveLogEdits}
                   >
-                    {isSaving ? "Saving..." : "Save"}
+                    {props.isSaving ? "Saving..." : "Save"}
                   </button>
                 </>
               )}
