@@ -6,6 +6,7 @@ import {
   useOnWindow,
   isServer,
   useContext,
+  useComputed$,
 } from "@qwik.dev/core";
 import type { DocumentHead } from "@qwik.dev/router";
 import { HosContext } from "~/components/hos-log/hours-of-service";
@@ -146,12 +147,10 @@ export default component$(() => {
   const historyRequestId = useSignal(0);
   const currentDate = useSignal(getLocalDateKey(new Date()));
   const currentMinute = useSignal(getMinuteOfDay(new Date()));
-  const currentDutyEntry = useSignal<DutyEntry>();
   const pendingStatusEntries = useSignal<StatusKey[]>([]);
   const isProcessingStatusEntries = useSignal(false);
 
   useTask$(({ track }) => {
-    const minute = track(() => currentMinute.value);
     const date = track(() => selectedDate.value);
     const logText = track(() => input.value);
     const completedAt = track(() => loadedRecord.value?.completedAt ?? null);
@@ -172,18 +171,20 @@ export default component$(() => {
       result.value = parsed.value;
       calculatedDuration.value = parsed.duration;
       error.value = parsed.error;
-      currentDutyEntry.value = getActiveDutyEntry(parsed.value, minute);
       todayBreakdownDuration.value = parsed.duration;
     } catch (cause) {
       result.value = [];
       calculatedDuration.value = createEmptyStatusDuration();
       todayBreakdownDuration.value = createEmptyStatusDuration();
-      currentDutyEntry.value = undefined;
       error.value =
         cause instanceof Error
           ? cause.message
           : "Failed to parse this day's log.";
     }
+  });
+
+  const currentDutyEntry = useComputed$(() => {
+    return getActiveDutyEntry(result.value, currentMinute.value);
   });
 
   useTask$(({ cleanup }) => {
