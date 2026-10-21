@@ -120,12 +120,12 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             </h2>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            {props.loadedRecord &&
-              props.input !== props.loadedRecord.logText && (
-                <span class="text-sm font-medium text-amber-700">
-                  Unsaved changes
-                </span>
-              )}
+            <span class="min-h-6 text-sm font-medium text-amber-700">
+              {props.loadedRecord &&
+                props.input !== props.loadedRecord.logText && (
+                  <>Unsaved changes</>
+                )}
+            </span>
             <button
               type="button"
               class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -150,16 +150,21 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
                 : "The breakdown shows elapsed time until you mark the day complete."}
             </p>
           </div>
-          {props.storageError && (
-            <p role="alert" class="w-full text-sm text-red-600">
-              Local storage error: {props.storageError}
-            </p>
-          )}
-          {props.storageMessage && (
-            <p role="status" class="w-full text-sm text-green-700">
-              {props.storageMessage}
-            </p>
-          )}
+          <div class="w-full space-y-2">
+            {props.storageError && (
+              <p role="alert" class="text-sm text-red-600">
+                Local storage error: {props.storageError}
+              </p>
+            )}
+            {!props.storageError && props.storageMessage && (
+              <p role="status" class="text-sm text-green-700">
+                {props.storageMessage}
+              </p>
+            )}
+            {!props.storageError && !props.storageMessage && (
+              <div class="h-6"></div>
+            )}
+          </div>
         </section>
 
         <section class="space-y-4">
