@@ -29,6 +29,46 @@ function getStatusPanelClass(status: StatusKey, isActive: boolean): string {
   }`;
 }
 
+function StatusIcon({ status }: { status: StatusKey }) {
+  const common = {
+    width: 32,
+    height: 32,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": 1.8,
+    "stroke-linecap": "round" as const,
+    "stroke-linejoin": "round" as const,
+    "aria-hidden": "true",
+    class: "h-7 w-7 shrink-0 sm:h-8 sm:w-8",
+  };
+  if (status === "D") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="2.2" />
+        <path d="M3.2 10.5c5.6-1.6 11.9-1.6 17.6 0" />
+        <path d="M12 14.2V21" />
+        <path d="M10.2 13.2 5.6 18.4M13.8 13.2l4.6 5.2" />
+      </svg>
+    );
+  }
+  if (status === "N") {
+    return (
+      <svg {...common}>
+        <path d="M4 15a8 8 0 0 1 16 0z" />
+        <path d="M2.5 15h19v3h-19z" />
+        <path d="M12 7v8M9 8.5v6.5M15 8.5v6.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+    </svg>
+  );
+}
+
 interface StatusPanelProps {
   status: SelectableStatusKey;
   label: string;
@@ -59,7 +99,8 @@ export const StatusPanel = component$((props: StatusPanelProps) => {
           Current
         </span>
       </span>
-      <span class="flex min-h-8 flex-1 items-center text-xs font-bold leading-tight sm:text-sm">
+      <span class="flex min-h-8 flex-1 flex-col items-start justify-center gap-1 text-xs font-bold leading-tight sm:text-sm">
+        <StatusIcon status={props.status} />
         {props.label}
       </span>
       <span
