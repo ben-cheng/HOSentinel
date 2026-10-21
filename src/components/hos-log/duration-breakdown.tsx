@@ -44,8 +44,8 @@ export const DurationBreakdown = component$((props: DurationBreakdownProps) => {
     <section
       class={
         isCard.value
-          ? "space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
-          : "rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5"
+          ? "space-y-4 rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5"
+          : "rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5"
       }
     >
       <h3
