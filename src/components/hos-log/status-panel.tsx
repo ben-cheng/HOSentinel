@@ -39,7 +39,7 @@ function StatusIcon({ status }: { status: StatusKey }) {
     "stroke-width": 1.8,
     "stroke-linecap": "round" as const,
     "stroke-linejoin": "round" as const,
-    "aria-hidden": "true",
+    "aria-hidden": true,
     class: "h-7 w-7 shrink-0 sm:h-8 sm:w-8",
   };
   if (status === "D") {
