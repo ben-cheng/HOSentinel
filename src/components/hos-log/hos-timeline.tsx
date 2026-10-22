@@ -46,6 +46,26 @@ function getTotals(intervals: TimelineInterval[], cutoff: number) {
   return duration;
 }
 
+// Decimal hours in hundredths; a complete day is forced to total exactly 24.00.
+export function getTotalHundredths(
+  duration: Record<StatusKey, number>,
+): Record<StatusKey, number> {
+  const hundredths = Object.fromEntries(
+    (Object.keys(duration) as StatusKey[]).map((key) => [
+      key,
+      Math.round((duration[key] * 100) / 60),
+    ]),
+  ) as Record<StatusKey, number>;
+  const minutes = Object.values(duration).reduce((sum, m) => sum + m, 0);
+  if (minutes === 1440) {
+    const diff =
+      2400 - Object.values(hundredths).reduce((sum, h) => sum + h, 0);
+    if (diff > 0) hundredths.D += diff;
+    else hundredths.O += diff;
+  }
+  return hundredths;
+}
+
 function isDrawn(interval: TimelineInterval): boolean {
   return ROWS.includes(interval.status);
 }
@@ -107,7 +127,9 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
       : props.intervals,
   );
 
-  const totals = useComputed$(() => getTotals(view.value, props.cutoffMinute));
+  const totals = useComputed$(() =>
+    getTotalHundredths(getTotals(view.value, props.cutoffMinute)),
+  );
   const labelIndex = dragIndex.value >= 0 ? dragIndex.value : hoverIndex.value;
   const labelInterval = labelIndex >= 0 ? view.value[labelIndex] : undefined;
 
@@ -173,7 +195,7 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
             text-anchor="end"
             class="fill-slate-700 text-[12px] font-semibold"
           >
-            {formatMinute(totals.value[key])}
+            {(totals.value[key] / 100).toFixed(2)}
           </text>
         </g>
       ))}
