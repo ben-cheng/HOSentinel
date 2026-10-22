@@ -1,14 +1,13 @@
 import { component$, $, useComputed$, useSignal } from "@qwik.dev/core";
 import type { QRL } from "@qwik.dev/core";
-import { DurationBreakdown } from "./duration-breakdown";
+import { HosTimeline } from "./hos-timeline";
+import { parseLogs } from "./hos-log-normalizer";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
-import type { StatusDuration } from "~/components/hos-log/hours-of-service";
 
 interface HistoryDrawerProps {
   date: string;
   today: string;
   input: string;
-  duration: StatusDuration;
   error: string | null;
   storageError: string | null;
   savedLogs: HosLogRecord[];
@@ -28,6 +27,17 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
   const historicalLogs = useComputed$(() =>
     props.savedLogs.filter((record) => record.date < props.today),
   );
+  const entries = useComputed$(() => {
+    try {
+      return parseLogs(props.input, {
+        date: props.date,
+        now: new Date(),
+        expectedDate: props.date,
+      }).value;
+    } catch {
+      return [];
+    }
+  });
   const isBusy = useComputed$(() => props.isLoading || props.isSaving);
 
   const openLogDialog = $(() => {
@@ -149,10 +159,13 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
             disabled={isBusy.value || !props.date}
             onClick$={openLogDialog}
           >
-            Edit log
+            Edit raw log
           </button>
 
-          <DurationBreakdown duration={props.duration} variant="section" />
+          <HosTimeline
+            entries={entries.value}
+            onSave={isBusy.value ? undefined : props.onSave}
+          />
         </div>
 
         <footer class="flex justify-end border-t border-slate-100 bg-slate-50/70 p-5">
@@ -178,7 +191,7 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
               id="historical-log-dialog-title"
               class="text-xl font-bold tracking-tight text-slate-900"
             >
-              Edit log for{" "}
+              Edit raw log for{" "}
               {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
             </h2>
             {(props.error || props.storageError || saveError.value) && (

@@ -36,7 +36,7 @@ export const LogEditor = component$((props: LogEditorProps) => {
               id="today-log-dialog-title"
               class="text-xl font-bold tracking-tight text-slate-900"
             >
-              {props.readOnly ? "View log" : "Edit log"}
+              {props.readOnly ? "View raw log" : "Edit raw log"}
             </h2>
             <label
               for="hos-log"

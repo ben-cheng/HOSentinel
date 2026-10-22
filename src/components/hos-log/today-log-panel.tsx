@@ -1,6 +1,6 @@
 import { component$, $, useComputed$, useSignal } from "@qwik.dev/core";
 import type { QRL } from "@qwik.dev/core";
-import { DurationBreakdown } from "./duration-breakdown";
+import { HosTimeline } from "./hos-timeline";
 import { STATUS_OPTIONS, StatusPanel } from "./status-panel";
 import type { SelectableStatusKey } from "./status-panel";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
@@ -8,7 +8,6 @@ import type {
   DutyEntry,
   DutyStatus,
   StatusKey,
-  StatusDuration,
 } from "~/components/hos-log/hours-of-service";
 
 const DUTY_STATUS_KEY: Partial<Record<DutyStatus, StatusKey>> = {
@@ -28,11 +27,18 @@ function getLocalDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getTimelineCutoff(date: string, isDayComplete: boolean): number {
+  const now = new Date();
+  return date === getLocalDateKey(now) && !isDayComplete
+    ? now.getHours() * 60 + now.getMinutes()
+    : 1440;
+}
+
 interface TodayLogPanelProps {
   date: string;
   input: string;
   currentDutyEntry?: DutyEntry;
-  calculatedDuration: StatusDuration;
+  entries: DutyEntry[];
   error: string | null;
   storageError: string | null;
   storageMessage: string | null;
@@ -183,7 +189,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               disabled={isDisabled.value}
               onClick$={openLogDialog}
             >
-              {isReadOnly.value ? "View log" : "Edit log"}
+              {isReadOnly.value ? "View raw log" : "Edit raw log"}
             </button>
           </div>
 
@@ -214,7 +220,13 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           <h2 class="mb-3 text-base font-semibold text-slate-900">
             Today’s breakdown
           </h2>
-          <DurationBreakdown duration={props.calculatedDuration} />
+          <div>
+            <HosTimeline
+              entries={props.entries}
+              cutoffMinute={getTimelineCutoff(props.date, props.isDayComplete)}
+              onSave={isDisabled.value ? undefined : props.onSaveLog}
+            />
+          </div>
         </div>
       </div>
 
@@ -230,7 +242,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
               id="today-log-dialog-title"
               class="text-xl font-bold tracking-tight text-slate-900"
             >
-              {isReadOnly.value ? "View log" : "Edit log"}
+              {isReadOnly.value ? "View raw log" : "Edit raw log"}
             </h2>
             <label
               for="hos-log"
