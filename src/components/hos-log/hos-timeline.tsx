@@ -118,7 +118,7 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label="24-hour duty status timeline"
-      style={props.editable ? { touchAction: "none" } : undefined}
+      style={props.editable ? { touchAction: "pan-x pan-y" } : undefined}
       onPointerMove$={(event, svg) => {
         if (dragIndex.value < 0) return;
         const { minute } = toSvgPoint(
@@ -248,6 +248,7 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
                 r={6}
                 class="cursor-grab fill-white stroke-blue-600 hover:fill-blue-100"
                 stroke-width={2}
+                style={{ touchAction: "none" }}
                 onPointerEnter$={() => (hoverIndex.value = index)}
                 onPointerLeave$={() => (hoverIndex.value = -1)}
                 onPointerDown$={(event, circle) => {
@@ -290,6 +291,8 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
   const saveError = useSignal<string | null>(null);
   const isSaving = useSignal(false);
   const baseline = useSignal("");
+  const isEditing = useSignal(false);
+  const zoom = useSignal(1);
 
   const compactIntervals = useComputed$(() =>
     toTimelineIntervals(props.entries),
@@ -300,6 +303,8 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
     draft.value = toTimelineIntervals(props.entries);
     baseline.value = toLogText(draft.value);
     saveError.value = null;
+    isEditing.value = false;
+    zoom.value = 1;
     isOpen.value = true;
   });
 
@@ -355,7 +360,49 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
               >
                 Timeline
               </h2>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap justify-end gap-2">
+                <div class="flex items-center overflow-hidden rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700">
+                  <button
+                    type="button"
+                    class="px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
+                    aria-label="Zoom out"
+                    disabled={zoom.value <= 0.5}
+                    onClick$={() =>
+                      (zoom.value = Math.max(0.5, zoom.value - 0.25))
+                    }
+                  >
+                    −
+                  </button>
+                  <span class="min-w-12 text-center tabular-nums">
+                    {Math.round(zoom.value * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    class="px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
+                    aria-label="Zoom in"
+                    disabled={zoom.value >= 3}
+                    onClick$={() =>
+                      (zoom.value = Math.min(3, zoom.value + 0.25))
+                    }
+                  >
+                    +
+                  </button>
+                </div>
+                {props.onSave && (
+                  <button
+                    type="button"
+                    aria-pressed={isEditing.value}
+                    class={[
+                      "rounded-xl border px-4 py-2 text-sm font-semibold",
+                      isEditing.value
+                        ? "border-blue-600 bg-blue-50 text-blue-700"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+                    ]}
+                    onClick$={() => (isEditing.value = !isEditing.value)}
+                  >
+                    {isEditing.value ? "Editing" : "Edit"}
+                  </button>
+                )}
                 <button
                   type="button"
                   class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -375,7 +422,7 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
                 )}
               </div>
             </div>
-            {props.onSave && (
+            {props.onSave && isEditing.value && (
               <p class="mb-3 text-sm text-slate-500">
                 Click a row to set a status at that time (15-minute steps),
                 click a node to remove it, or drag a node to change its time.
@@ -392,10 +439,10 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
             <div class="overflow-x-auto">
               <TimelineSvg
                 intervals={draft.value}
-                hourWidth={FULL_HOUR_WIDTH}
+                hourWidth={FULL_HOUR_WIDTH * zoom.value}
                 cutoffMinute={props.cutoffMinute ?? 1440}
                 fit={false}
-                editable={Boolean(props.onSave)}
+                editable={Boolean(props.onSave) && isEditing.value}
                 onAdd={$((minute: number, status: StatusKey) => {
                   draft.value = addStatusAt(draft.value, minute, status);
                 })}
