@@ -67,7 +67,7 @@ export const DurationBreakdown = component$((props: DurationBreakdownProps) => {
               {STATUS_LABEL[status]}
             </div>
             <div class="w-fit whitespace-nowrap text-lg font-bold tabular-nums text-slate-900">
-              {Number((roundedCents.value[status] / 100).toFixed(2))} h
+              {(roundedCents.value[status] / 100).toFixed(2)} h
             </div>
           </div>
         ))}
