@@ -116,40 +116,44 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           </p>
         </div>
 
-        <section class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-          <div>
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Selected day
-            </p>
-            <h2 class="mt-1 text-lg font-semibold text-slate-900">
-              {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
-            </h2>
+        <section class="flex flex-col justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+          <div class="flex flex-wrap justify-between gap-4">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Selected day
+              </p>
+              <h2 class="mt-1 text-lg font-semibold text-slate-900">
+                {new Date(`${props.date}T00:00:00`).toLocaleDateString()}
+              </h2>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="min-h-6 text-sm font-medium text-amber-700">
+                {props.loadedRecord &&
+                  props.input !== props.loadedRecord.logText && (
+                    <>Unsaved changes</>
+                  )}
+              </span>
+              <button
+                type="button"
+                class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isDisabled.value}
+                onClick$={props.onOpenHistory}
+              >
+                View past logs
+              </button>
+              <button
+                type="button"
+                class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:opacity-50"
+                disabled={
+                  isDisabled.value || props.date !== getLocalDateKey(new Date())
+                }
+                onClick$={() => props.onSetDayComplete(!props.isDayComplete)}
+              >
+                {props.isDayComplete ? "Reopen day" : "Mark day complete"}
+              </button>
+            </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <span class="min-h-6 text-sm font-medium text-amber-700">
-              {props.loadedRecord &&
-                props.input !== props.loadedRecord.logText && (
-                  <>Unsaved changes</>
-                )}
-            </span>
-            <button
-              type="button"
-              class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isDisabled.value}
-              onClick$={props.onOpenHistory}
-            >
-              View past logs
-            </button>
-            <button
-              type="button"
-              class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:opacity-50"
-              disabled={
-                isDisabled.value || props.date !== getLocalDateKey(new Date())
-              }
-              onClick$={() => props.onSetDayComplete(!props.isDayComplete)}
-            >
-              {props.isDayComplete ? "Reopen day" : "Mark day complete"}
-            </button>
             <p class="w-full text-xs leading-5 text-slate-500">
               {props.isDayComplete
                 ? "Remaining time is counted as Off-duty."
@@ -210,12 +214,6 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           )}
         </section>
 
-        <div class="flex min-h-6 items-center justify-between">
-          {props.error && (
-            <span class="text-sm text-red-500">{props.error}</span>
-          )}
-        </div>
-
         <div>
           <h2 class="mb-3 text-base font-semibold text-slate-900">
             Today’s breakdown
@@ -229,6 +227,12 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           </div>
         </div>
       </div>
+
+        <div class="flex min-h-6 items-center justify-between">
+          {props.error && (
+            <span class="text-sm text-red-500">{props.error}</span>
+          )}
+        </div>
 
       {isLogDialogOpen.value && (
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
