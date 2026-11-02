@@ -19,15 +19,12 @@ import {
   parseLogs,
 } from "~/components/hos-log/hos-log-normalizer";
 import { getHosLog } from "~/components/hos-log/hos-log-storage";
-import { HistoryDrawer } from "~/components/hos-log/history-drawer";
 import { TodayLogPanel } from "~/components/hos-log/today-log-panel";
 import { useTodayLog } from "~/components/hos-log/use-today-log";
-import { useHistoryLog } from "~/components/hos-log/use-history-log";
 import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
 import {
   getLocalDateKey,
   getMinuteOfDay,
-  getPreviousLocalDateKey,
   isToday,
 } from "~/components/hos-log/date-utils";
 
@@ -63,9 +60,8 @@ export default component$(() => {
 
   // Use composable hooks for state management
   const todayLog = useTodayLog();
-  const { savedLogs, storageReady, refreshSavedLogs, getStartingStatus } =
+  const { storageReady, refreshSavedLogs, getStartingStatus } =
     useStorageLogs();
-  const historyLog = useHistoryLog(savedLogs);
 
   // Update time every 15 seconds
   useTask$(({ cleanup }) => {
@@ -230,13 +226,9 @@ export default component$(() => {
     );
   });
 
-  // Open history to most recent past log
+  // Full navigation so the history page loads its data from IndexedDB
   const openHistory = $(() => {
-    const yesterday = getPreviousLocalDateKey(getLocalDateKey(new Date()));
-    const mostRecentPastLog = savedLogs.value.find(
-      (record) => record.date < getLocalDateKey(new Date()),
-    );
-    historyLog.openHistoricalDay(mostRecentPastLog?.date ?? yesterday);
+    window.location.assign("/history/");
   });
 
   // Handle day complete toggle
@@ -264,12 +256,7 @@ export default component$(() => {
 
   // Add status button handler (with guard for history/completed)
   const addStatusEntry = $(async (status: "O" | "D" | "N") => {
-    if (
-      historyLog.open.value ||
-      todayLog.loadedRecord.value?.completedAt
-    ) {
-      return;
-    }
+    if (todayLog.loadedRecord.value?.completedAt) return;
 
     // Ensure we're on today
     if (!isToday(todayLog.date.value)) {
@@ -283,6 +270,23 @@ export default component$(() => {
 
   return (
     <div class="min-h-screen bg-linear-to-br from-slate-100 via-slate-50 to-blue-100 px-4 py-8 sm:px-6 lg:py-12">
+
+      <div
+        class="mx-auto w-full max-w-4xl space-y-8 rounded-3xl border border-white/80 bg-white p-5 shadow-xl shadow-slate-300/50 sm:p-8"
+      >
+        <div class="border-b border-slate-100 pb-6">
+          <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">
+            HOSentinel · Daily log
+          </p>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            Hours of Service
+          </h1>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+            A status followed by a time ends that interval. A final status
+            without a time is temporary; unassigned time is Off-duty (O).
+          </p>
+        </div>
+
       <TodayLogPanel
         date={todayLog.date.value}
         input={todayLog.input.value}
@@ -293,7 +297,6 @@ export default component$(() => {
         storageMessage={todayLog.storageMessage.value}
         loadedRecord={todayLog.loadedRecord.value}
         isDayComplete={todayLog.isDayComplete.value}
-        historyOpen={historyLog.open.value}
         storageReady={storageReady.value}
         isLoadingDay={todayLog.isLoadingDay.value}
         isSaving={todayLog.isSaving.value}
@@ -303,26 +306,7 @@ export default component$(() => {
         onSetDayComplete={setDayComplete}
       />
 
-      {historyLog.open.value && (
-        <HistoryDrawer
-          date={historyLog.historyDate.value}
-          today={getPreviousLocalDateKey(getLocalDateKey(new Date()))}
-          input={historyLog.historyInput.value}
-          error={historyLog.historyError.value}
-          storageError={historyLog.historyStorageError.value}
-          savedLogs={savedLogs.value}
-          isLoading={historyLog.isHistoryLoading.value}
-          isSaving={historyLog.isHistorySaving.value}
-          onSelectDay={historyLog.openHistoricalDay}
-          onInput={$(
-            (value: string) => {
-              historyLog.historyInput.value = value;
-            },
-          )}
-          onSave={historyLog.saveHistoricalDay}
-          onDiscard={historyLog.discardChanges}
-        />
-      )}
+      </div>
     </div>
   );
 });

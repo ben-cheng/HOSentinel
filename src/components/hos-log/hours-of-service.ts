@@ -34,6 +34,16 @@ export function createEmptyStatusDuration(): StatusDuration {
   ) as StatusDuration;
 }
 
+const DUTY_STATUS_KEY_MAP: Partial<Record<DutyStatus, StatusKey>> = {
+  OFF_DUTY: "O",
+  DRIVING: "D",
+  ON_DUTY_NOT_DRIVING: "N",
+};
+
+export function getCurrentStatus(entry?: DutyEntry): StatusKey | undefined {
+  return entry ? DUTY_STATUS_KEY_MAP[entry.status] : undefined;
+}
+
 export type DutyEntry = {
   startTime: string;
   endTime: string;

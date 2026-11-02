@@ -4,9 +4,9 @@ import { HosTimeline } from "./hos-timeline";
 import { parseLogs } from "./hos-log-normalizer";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
 
-interface HistoryDrawerProps {
+interface HistoryLogPanelProps {
   date: string;
-  today: string;
+  maxDate: string;
   input: string;
   error: string | null;
   storageError: string | null;
@@ -16,16 +16,15 @@ interface HistoryDrawerProps {
   onSelectDay: QRL<(date: string) => void>;
   onInput: QRL<(logText: string) => void>;
   onSave: QRL<(logText: string) => Promise<boolean>>;
-  onDiscard: QRL<() => void>;
 }
 
-export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
+export const HistoryLogPanel = component$((props: HistoryLogPanelProps) => {
   const isLogDialogOpen = useSignal(false);
   const editedLog = useSignal("");
   const baselineLog = useSignal("");
   const saveError = useSignal<string | null>(null);
   const historicalLogs = useComputed$(() =>
-    props.savedLogs.filter((record) => record.date < props.today),
+    props.savedLogs.filter((record) => record.date <= props.maxDate),
   );
   const entries = useComputed$(() => {
     try {
@@ -72,112 +71,70 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
   });
 
   return (
-    <div class="fixed inset-0 z-50 flex justify-end">
-      <button
-        type="button"
-        class="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
-        aria-label="Close historical logs"
-        onClick$={props.onDiscard}
-      />
-      <aside
-        class="relative flex h-full w-full max-w-xl animate-[history-slide-in_250ms_ease-out] flex-col border-l border-slate-200 bg-white shadow-2xl"
-        aria-label="Historical HOS log"
-      >
-        <header class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/80 p-6">
-          <div>
-            <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-              Historical record
-            </p>
-            <h2 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              {props.date
-                ? new Date(`${props.date}T00:00:00`).toLocaleDateString()
-                : "Select a day"}
-            </h2>
-          </div>
-          <button
-            type="button"
-            class="rounded-xl p-2 text-2xl leading-none text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
-            aria-label="Close historical logs"
-            onClick$={props.onDiscard}
-          >
-            &times;
-          </button>
-        </header>
-
-        <div class="flex-1 space-y-6 overflow-y-auto p-6">
-          <label class="flex max-w-xs flex-col gap-1 text-sm font-medium text-gray-700">
-            Select historical day
-            <input
-              type="date"
-              max={props.today}
-              class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
-              value={props.date}
-              disabled={isBusy.value}
-              onInput$={(event) => {
-                const date = (event.target as HTMLInputElement).value;
-                if (date) props.onSelectDay(date);
-              }}
-            />
-          </label>
-
-          <div>
-            <h3 class="mb-2 text-sm font-semibold text-gray-700">
-              Saved historical days
-            </h3>
-            {historicalLogs.value.length > 0 ? (
-              <div class="flex flex-wrap gap-2">
-                {historicalLogs.value.map((record) => (
-                  <button
-                    key={record.date}
-                    type="button"
-                    disabled={isBusy.value}
-                    class={`rounded-full border px-3 py-1.5 text-sm transition ${
-                      props.date === record.date
-                        ? "border-blue-200 bg-blue-50 font-semibold text-blue-800"
-                        : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                    onClick$={() => props.onSelectDay(record.date)}
-                  >
-                    {new Date(`${record.date}T00:00:00`).toLocaleDateString()}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p class="text-sm text-gray-500">No saved historical logs yet.</p>
-            )}
-          </div>
-
-          {props.storageError && (
-            <p role="alert" class="text-sm text-red-600">
-              Local storage error: {props.storageError}
-            </p>
-          )}
-
-          <button
-            type="button"
-            class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-            disabled={isBusy.value || !props.date}
-            onClick$={openLogDialog}
-          >
-            Edit raw log
-          </button>
-
-          <HosTimeline
-            entries={entries.value}
-            onSave={isBusy.value ? undefined : props.onSave}
+    <>
+      <div class="space-y-6">
+        <label class="flex max-w-xs flex-col gap-1 text-sm font-medium text-gray-700">
+          Select historical day
+          <input
+            type="date"
+            max={props.maxDate}
+            class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
+            value={props.date}
+            disabled={isBusy.value}
+            onInput$={(event) => {
+              const date = (event.target as HTMLInputElement).value;
+              if (date) props.onSelectDay(date);
+            }}
           />
+        </label>
+
+        <div>
+          <h3 class="mb-2 text-sm font-semibold text-gray-700">
+            Saved historical days
+          </h3>
+          {historicalLogs.value.length > 0 ? (
+            <div class="flex flex-wrap gap-2">
+              {historicalLogs.value.map((record) => (
+                <button
+                  key={record.date}
+                  type="button"
+                  disabled={isBusy.value}
+                  class={`rounded-full border px-3 py-1.5 text-sm transition ${
+                    props.date === record.date
+                      ? "border-blue-200 bg-blue-50 font-semibold text-blue-800"
+                      : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                  onClick$={() => props.onSelectDay(record.date)}
+                >
+                  {new Date(`${record.date}T00:00:00`).toLocaleDateString()}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p class="text-sm text-gray-500">No saved historical logs yet.</p>
+          )}
         </div>
 
-        <footer class="flex justify-end border-t border-slate-100 bg-slate-50/70 p-5">
-          <button
-            type="button"
-            class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            onClick$={props.onDiscard}
-          >
-            Close
-          </button>
-        </footer>
-      </aside>
+        {props.storageError && (
+          <p role="alert" class="text-sm text-red-600">
+            Local storage error: {props.storageError}
+          </p>
+        )}
+
+        <button
+          type="button"
+          class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+          disabled={isBusy.value || !props.date}
+          onClick$={openLogDialog}
+        >
+          Edit raw log
+        </button>
+
+        <HosTimeline
+          entries={entries.value}
+          onSave={isBusy.value ? undefined : props.onSave}
+        />
+      </div>
 
       {isLogDialogOpen.value && (
         <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
@@ -244,6 +201,6 @@ export const HistoryDrawer = component$((props: HistoryDrawerProps) => {
           </section>
         </div>
       )}
-    </div>
+    </>
   );
 });

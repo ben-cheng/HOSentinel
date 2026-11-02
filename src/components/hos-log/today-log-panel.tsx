@@ -6,19 +6,11 @@ import type { SelectableStatusKey } from "./status-panel";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
 import type {
   DutyEntry,
-  DutyStatus,
-  StatusKey,
+} from "~/components/hos-log/hours-of-service";
+import {
+  getCurrentStatus,
 } from "~/components/hos-log/hours-of-service";
 
-const DUTY_STATUS_KEY: Partial<Record<DutyStatus, StatusKey>> = {
-  OFF_DUTY: "O",
-  DRIVING: "D",
-  ON_DUTY_NOT_DRIVING: "N",
-};
-
-function getCurrentStatus(entry?: DutyEntry): StatusKey | undefined {
-  return entry ? DUTY_STATUS_KEY[entry.status] : undefined;
-}
 
 function getLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -44,7 +36,6 @@ interface TodayLogPanelProps {
   storageMessage: string | null;
   loadedRecord: HosLogRecord | null;
   isDayComplete: boolean;
-  historyOpen: boolean;
   storageReady: boolean;
   isLoadingDay: boolean;
   isSaving: boolean;
@@ -67,6 +58,8 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
   const isStatusDisabled = useComputed$(
     () => isDisabled.value || isReadOnly.value,
   );
+
+  const currentStatus = useComputed$(() => getCurrentStatus(props.currentDutyEntry));
 
   const openLogDialog = $(() => {
     editedLog.value = props.input;
@@ -98,24 +91,6 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
 
   return (
     <>
-      <div
-        class="mx-auto w-full max-w-4xl space-y-8 rounded-3xl border border-white/80 bg-white p-5 shadow-xl shadow-slate-300/50 sm:p-8"
-        aria-hidden={props.historyOpen || isLogDialogOpen.value}
-        inert={props.historyOpen || isLogDialogOpen.value}
-      >
-        <div class="border-b border-slate-100 pb-6">
-          <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">
-            HOSentinel · Daily log
-          </p>
-          <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Hours of Service
-          </h1>
-          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            A status followed by a time ends that interval. A final status
-            without a time is temporary; unassigned time is Off-duty (O).
-          </p>
-        </div>
-
         <section class="flex flex-col justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
           <div class="flex flex-wrap justify-between gap-4">
             <div>
@@ -197,21 +172,19 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             </button>
           </div>
 
-          {!props.historyOpen && (
-            <div class="grid grid-cols-3 gap-2 sm:gap-3">
-              {STATUS_OPTIONS.map(({ status, label }) => (
-                <StatusPanel
-                  key={status}
-                  status={status}
-                  label={label}
-                  currentStatus={getCurrentStatus(props.currentDutyEntry)}
-                  currentSince={props.currentDutyEntry?.startTime}
-                  disabled={isStatusDisabled.value}
-                  onAddStatus={props.onAddStatus}
-                />
-              ))}
-            </div>
-          )}
+          <div class="grid grid-cols-3 gap-2 sm:gap-3">
+            {STATUS_OPTIONS.map(({ status, label }) => (
+              <StatusPanel
+                key={status}
+                status={status}
+                label={label}
+                currentStatus={currentStatus.value}
+                currentSince={props.currentDutyEntry?.startTime}
+                disabled={isStatusDisabled.value}
+                onAddStatus={props.onAddStatus}
+              />
+            ))}
+          </div>
         </section>
 
         <div>
@@ -226,13 +199,12 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
             />
           </div>
         </div>
-      </div>
 
-        <div class="flex min-h-6 items-center justify-between">
-          {props.error && (
-            <span class="text-sm text-red-500">{props.error}</span>
-          )}
-        </div>
+      <div class="flex min-h-6 items-center justify-between">
+        {props.error && (
+          <span class="text-sm text-red-500">{props.error}</span>
+        )}
+      </div>
 
       {isLogDialogOpen.value && (
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
