@@ -7,6 +7,7 @@ import {
   useSignal,
 } from "@qwik.dev/core";
 import { QwikRouterProvider, RouterOutlet } from "@qwik.dev/router";
+import { TimeProvider } from "./components/time/time-provider";
 import { RouterHead } from "./components/router-head/router-head";
 import { HosContext } from "./components/hos-log/hours-of-service";
 import type { DailyLog } from "./components/hos-log/hours-of-service";
@@ -73,7 +74,9 @@ export default component$(() => {
         <RouterHead />
       </head>
       <body lang="en">
-        <RouterOutlet />
+        <TimeProvider>
+          <RouterOutlet />
+        </TimeProvider>
       </body>
     </QwikRouterProvider>
   );

@@ -19,14 +19,20 @@ function getLocalDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function getTimelineCutoff(date: string, isDayComplete: boolean): number {
-  const now = new Date();
+function getTimelineCutoff(
+  date: string,
+  isDayComplete: boolean,
+  nowMs: number,
+): number {
+  const now = new Date(nowMs);
   return date === getLocalDateKey(now) && !isDayComplete
     ? now.getHours() * 60 + now.getMinutes()
     : 1440;
 }
 
 interface TodayLogPanelProps {
+  /** Epoch ms, supplied by the caller so the panel stays pure. */
+  now: number;
   date: string;
   input: string;
   currentDutyEntry?: DutyEntry;
@@ -53,7 +59,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
     () => !props.storageReady || props.isLoadingDay || props.isSaving,
   );
   const isReadOnly = useComputed$(
-    () => props.isDayComplete || props.date < getLocalDateKey(new Date()),
+    () => props.isDayComplete || props.date < getLocalDateKey(new Date(props.now)),
   );
   const isStatusDisabled = useComputed$(
     () => isDisabled.value || isReadOnly.value,
@@ -120,7 +126,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
                 type="button"
                 class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:opacity-50"
                 disabled={
-                  isDisabled.value || props.date !== getLocalDateKey(new Date())
+                  isDisabled.value || props.date !== getLocalDateKey(new Date(props.now))
                 }
                 onClick$={() => props.onSetDayComplete(!props.isDayComplete)}
               >
@@ -194,7 +200,7 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           <div>
             <HosTimeline
               entries={props.entries}
-              cutoffMinute={getTimelineCutoff(props.date, props.isDayComplete)}
+              cutoffMinute={getTimelineCutoff(props.date, props.isDayComplete, props.now)}
               onSave={isDisabled.value ? undefined : props.onSaveLog}
             />
           </div>

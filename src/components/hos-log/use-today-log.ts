@@ -15,16 +15,13 @@ import type { ParseResult } from "./hos-log-normalizer";
 import { updateLogForStatus } from "./hos-log-status-updater";
 import { saveHosLog } from "./hos-log-storage";
 import type { HosLogRecord } from "./hos-log-storage";
+import { getMinuteOfDay } from "./date-utils";
 
 function getLocalDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function getMinuteOfDay(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
 }
 
 export interface TodayLogState {
@@ -43,7 +40,8 @@ export interface TodayLogState {
   isLoadingDay: boolean;
 }
 
-export function useTodayLog() {
+/** `now` is epoch ms from useNow(); the current minute derives from it. */
+export function useTodayLog(now: { readonly value: number }) {
   const date = useSignal("");
   const input = useSignal("O");
   const result = useSignal<DutyEntry[]>([]);
@@ -54,7 +52,7 @@ export function useTodayLog() {
   const storageError = useSignal<string | null>(null);
   const storageMessage = useSignal<string | null>(null);
   const loadedRecord = useSignal<HosLogRecord | null>(null);
-  const currentMinute = useSignal(getMinuteOfDay(new Date()));
+  const currentMinute = useComputed$(() => getMinuteOfDay(new Date(now.value)));
   const isSaving = useSignal(false);
   const isLoadingDay = useSignal(false);
   const pendingStatusEntries = useSignal<StatusKey[]>([]);
@@ -65,10 +63,11 @@ export function useTodayLog() {
     const logDate = track(() => date.value);
     const logText = track(() => input.value);
     const completedAt = track(() => loadedRecord.value?.completedAt ?? null);
+    const nowMs = track(() => now.value);
     try {
       const parsed = parseLogs(logText, {
         date: logDate,
-        now: new Date(),
+        now: new Date(nowMs),
         completedAt,
         expectedDate: logDate,
       });

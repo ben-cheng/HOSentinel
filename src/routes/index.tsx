@@ -1,6 +1,6 @@
 import {
   component$,
-  useSignal,
+  useComputed$,
   $,
   useTask$,
   useOnWindow,
@@ -20,11 +20,11 @@ import {
 } from "~/components/hos-log/hos-log-normalizer";
 import { getHosLog } from "~/components/hos-log/hos-log-storage";
 import { TodayLogPanel } from "~/components/hos-log/today-log-panel";
+import { useNow } from "~/components/time/use-now";
 import { useTodayLog } from "~/components/hos-log/use-today-log";
 import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
 import {
   getLocalDateKey,
-  getMinuteOfDay,
   isToday,
 } from "~/components/hos-log/date-utils";
 
@@ -55,27 +55,13 @@ function toDailyLog(
 
 export default component$(() => {
   const dailyLog = useContext(HosContext);
-  const currentDate = useSignal(getLocalDateKey(new Date()));
-  const currentMinute = useSignal(getMinuteOfDay(new Date()));
+  const now = useNow(60_000);
+  const currentDate = useComputed$(() => getLocalDateKey(new Date(now.value)));
 
   // Use composable hooks for state management
-  const todayLog = useTodayLog();
+  const todayLog = useTodayLog(now);
   const { storageReady, refreshSavedLogs, getStartingStatus } =
     useStorageLogs();
-
-  // Update time every 15 seconds
-  useTask$(({ cleanup }) => {
-    if (isServer) return;
-
-    const updateCurrentMinute = () => {
-      const now = new Date();
-      currentDate.value = getLocalDateKey(now);
-      currentMinute.value = getMinuteOfDay(now);
-    };
-    updateCurrentMinute();
-    const interval = setInterval(updateCurrentMinute, 15_000);
-    cleanup(() => clearInterval(interval));
-  });
 
   // Update dailyLog context
   useTask$(({ track }) => {
@@ -288,6 +274,7 @@ export default component$(() => {
         </div>
 
       <TodayLogPanel
+        now={now.value}
         date={todayLog.date.value}
         input={todayLog.input.value}
         currentDutyEntry={todayLog.currentDutyEntry.value}
