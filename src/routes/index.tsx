@@ -3,7 +3,7 @@ import {
   useComputed$,
   $,
   useTask$,
-  useOnWindow,
+  useVisibleTask$,
   isServer,
   useContext,
 } from "@qwik.dev/core";
@@ -19,7 +19,8 @@ import {
   parseLogs,
 } from "~/components/hos-log/hos-log-normalizer";
 import { getHosLog } from "~/components/hos-log/hos-log-storage";
-import { TodayLogPanel } from "~/components/hos-log/today-log-panel";
+import { TodayLogView } from "~/components/hos-log/today-log-view";
+import { Link } from "@qwik.dev/router";
 import { useNow } from "~/components/time/use-now";
 import { useTodayLog } from "~/components/hos-log/use-today-log";
 import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
@@ -101,9 +102,10 @@ export default component$(() => {
   });
 
   // Load today's log on mount
-  useOnWindow(
-    "load",
-    $(async () => {
+  // Runs on mount, including client-side navigation (window "load" would not).
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    async () => {
       const today = getLocalDateKey(new Date());
       todayLog.date.value = today;
       try {
@@ -140,7 +142,8 @@ export default component$(() => {
             : "Failed to open local HOS log storage.",
         );
       }
-    }),
+    },
+    { strategy: "document-ready" },
   );
 
   // Roll over to today if date changed
@@ -212,11 +215,6 @@ export default component$(() => {
     );
   });
 
-  // Full navigation so the history page loads its data from IndexedDB
-  const openHistory = $(() => {
-    window.location.assign("/history/");
-  });
-
   // Handle day complete toggle
   const setDayComplete = $(async (completed: boolean) => {
     if (
@@ -240,18 +238,15 @@ export default component$(() => {
     );
   });
 
-  // Add status button handler (with guard for history/completed)
-  const addStatusEntry = $(async (status: "O" | "D" | "N") => {
+  // Status switcher emits the full updated log
+  const applyStatusLog = $(async (logText: string) => {
     if (todayLog.loadedRecord.value?.completedAt) return;
-
-    // Ensure we're on today
     if (!isToday(todayLog.date.value)) {
       await rollOverToToday();
       if (todayLog.storageError.value) return;
     }
-
-    await todayLog.queueStatusEntry(status);
-    await todayLog.processPendingStatusEntries();
+    todayLog.input.value = logText;
+    await todayLog.persistLog(todayLog.date.value, logText);
   });
 
   return (
@@ -267,31 +262,29 @@ export default component$(() => {
           <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
             Hours of Service
           </h1>
-          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            A status followed by a time ends that interval. A final status
-            without a time is temporary; unassigned time is Off-duty (O).
-          </p>
+          <nav class="mt-3 flex gap-4 text-sm font-semibold text-blue-700">
+            <Link href="/history/">Log history</Link>
+            <Link href="/report/">Cycle report</Link>
+          </nav>
         </div>
 
-      <TodayLogPanel
-        now={now.value}
-        date={todayLog.date.value}
-        input={todayLog.input.value}
-        currentDutyEntry={todayLog.currentDutyEntry.value}
-        entries={todayLog.result.value}
-        error={todayLog.error.value}
-        storageError={todayLog.storageError.value}
-        storageMessage={todayLog.storageMessage.value}
-        loadedRecord={todayLog.loadedRecord.value}
-        isDayComplete={todayLog.isDayComplete.value}
-        storageReady={storageReady.value}
-        isLoadingDay={todayLog.isLoadingDay.value}
-        isSaving={todayLog.isSaving.value}
-        onOpenHistory={openHistory}
-        onSaveLog={saveEditedLog}
-        onAddStatus={addStatusEntry}
-        onSetDayComplete={setDayComplete}
-      />
+        <TodayLogView
+          now={now.value}
+          date={todayLog.date.value}
+          log={todayLog.input.value}
+          isComplete={todayLog.isDayComplete.value}
+          disabled={
+            !storageReady.value ||
+            todayLog.isLoadingDay.value ||
+            todayLog.isSaving.value
+          }
+          error={todayLog.error.value}
+          storageError={todayLog.storageError.value}
+          storageMessage={todayLog.storageMessage.value}
+          onChange$={applyStatusLog}
+          onSave$={saveEditedLog}
+          onSetComplete$={setDayComplete}
+        />
 
       </div>
     </div>

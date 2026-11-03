@@ -7,10 +7,15 @@ import { $ } from "@qwik.dev/core";
 const LOG = "2026-10-13\nO0630D0930O";
 
 describe("LogEditForm", () => {
-  it("shows the raw log and no inputs in read mode", async () => {
+  it("lists each entry as readable status and time in read mode", async () => {
     const { render, screen } = await createDOM();
     await render(<LogEditForm log={LOG} mode="read" />);
-    expect(screen.querySelector("pre")?.textContent).toContain("O0630D0930O");
+    const text = screen.querySelector("ol")?.textContent ?? "";
+    expect(text).toContain("Off Duty");
+    expect(text).toContain("06:30");
+    expect(text).toContain("Driving");
+    expect(text).toContain("09:30");
+    expect(text).toContain("end of day");
     expect(screen.querySelectorAll("select")).toHaveLength(0);
   });
 

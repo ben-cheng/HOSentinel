@@ -38,3 +38,12 @@ export function isPastDate(dateKey: string): boolean {
 export function isFutureDate(dateKey: string): boolean {
   return dateKey > getLocalDateKey(new Date());
 }
+
+/** Local date keys from `from` through `through` (inclusive), oldest first. */
+export function listDateKeys(from: string, through: string): string[] {
+  const keys: string[] = [];
+  for (let key = from; key <= through; key = getNextLocalDateKey(key)) {
+    keys.push(key);
+  }
+  return keys;
+}

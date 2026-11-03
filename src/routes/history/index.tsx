@@ -1,8 +1,14 @@
-import { component$, useOnWindow, $ } from "@qwik.dev/core";
+import { component$, useComputed$, useVisibleTask$, useSignal, $ } from "@qwik.dev/core";
 import { Link, type DocumentHead } from "@qwik.dev/router";
-import { HistoryLogPanel } from "~/components/hos-log/history-log-panel";
-import { useHistoryLog } from "~/components/hos-log/use-history-log";
+import { HistoryList } from "~/components/hos-log/history-list";
+import { buildHistoryItems } from "~/components/hos-log/history-items";
 import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
+import { saveHosLog } from "~/components/hos-log/hos-log-storage";
+import {
+  formatDailyLog,
+  finalizeCompletedLogEntries,
+  parseLogs,
+} from "~/components/hos-log/hos-log-normalizer";
 import {
   getLocalDateKey,
   getPreviousLocalDateKey,
@@ -10,24 +16,55 @@ import {
 
 export default component$(() => {
   const { savedLogs, refreshSavedLogs } = useStorageLogs();
-  const historyLog = useHistoryLog(savedLogs);
+  const storageError = useSignal<string | null>(null);
+  const maxDate = getPreviousLocalDateKey(getLocalDateKey(new Date()));
+  const items = useComputed$(() => buildHistoryItems(savedLogs.value, maxDate));
 
-  useOnWindow(
-    "load",
-    $(async () => {
-      const today = getLocalDateKey(new Date());
+  // Runs on mount, including client-side navigation (window "load" would not).
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    async () => {
       try {
-        const records = await refreshSavedLogs();
-        const latestPast = records.find((record) => record.date < today);
-        if (latestPast) await historyLog.openHistoricalDay(latestPast.date);
+        await refreshSavedLogs();
       } catch (cause) {
-        historyLog.historyStorageError.value =
+        storageError.value =
           cause instanceof Error
             ? cause.message
             : "Failed to open local HOS log storage.";
       }
-    }),
+    },
+    { strategy: "document-ready" },
   );
+
+  const saveDay = $(async (date: string, log: string) => {
+    if (!date || date >= getLocalDateKey(new Date())) return false;
+    try {
+      const existing = savedLogs.value.find((record) => record.date === date);
+      const parsed = parseLogs(log, {
+        date,
+        completedAt: existing?.completedAt,
+        expectedDate: date,
+      });
+      const entries = existing?.completedAt
+        ? finalizeCompletedLogEntries(
+            parsed.canonicalEntries,
+            existing.completedAt,
+          )
+        : parsed.canonicalEntries;
+      await saveHosLog({
+        date,
+        logText: formatDailyLog(date, entries).replace(/\s/g, ""),
+        updatedAt: new Date().toISOString(),
+        completedAt: existing?.completedAt ?? null,
+      });
+      await refreshSavedLogs();
+      return true;
+    } catch (cause) {
+      storageError.value =
+        cause instanceof Error ? cause.message : "Failed to save this day's log.";
+      return false;
+    }
+  });
 
   return (
     <div class="min-h-screen bg-linear-to-br from-slate-100 via-slate-50 to-blue-100 px-4 py-8 sm:px-6 lg:py-12">
@@ -35,14 +72,10 @@ export default component$(() => {
         <header class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/80 p-6">
           <div>
             <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-              Historical record
+              HOSentinel
             </p>
             <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              {historyLog.historyDate.value
-                ? new Date(
-                    `${historyLog.historyDate.value}T00:00:00`,
-                  ).toLocaleDateString()
-                : "Select a day"}
+              Log history
             </h1>
           </div>
           <Link
@@ -52,21 +85,16 @@ export default component$(() => {
             Back to today
           </Link>
         </header>
-        <div class="p-6">
-          <HistoryLogPanel
-            date={historyLog.historyDate.value}
-            maxDate={getPreviousLocalDateKey(getLocalDateKey(new Date()))}
-            input={historyLog.historyInput.value}
-            error={historyLog.historyError.value}
-            storageError={historyLog.historyStorageError.value}
-            savedLogs={savedLogs.value}
-            isLoading={historyLog.isHistoryLoading.value}
-            isSaving={historyLog.isHistorySaving.value}
-            onSelectDay={historyLog.openHistoricalDay}
-            onInput={$((value: string) => {
-              historyLog.historyInput.value = value;
-            })}
-            onSave={historyLog.saveHistoricalDay}
+        <div class="space-y-4 p-6">
+          {storageError.value && (
+            <p role="alert" class="text-sm text-red-600">
+              Local storage error: {storageError.value}
+            </p>
+          )}
+          <HistoryList
+            items={items.value}
+            maxDate={maxDate}
+            onSave$={saveDay}
           />
         </div>
       </div>

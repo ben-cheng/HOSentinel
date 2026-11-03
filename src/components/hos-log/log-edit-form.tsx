@@ -4,6 +4,7 @@ import { HosTimeline } from "./hos-timeline";
 import {
   formModelToLog,
   logToFormModel,
+  insertRowBefore,
   validateLog,
   type FormModel,
 } from "./hos-log-form-model";
@@ -13,13 +14,20 @@ interface LogEditFormProps {
   /** Raw log text. */
   log: string;
   mode: "read" | "edit";
+  /** When true the final status may run "until now". */
+  isToday?: boolean;
   cutoffMinute?: number;
   onSave$?: QRL<(log: string) => void>;
   onCancel$?: QRL<() => void>;
 }
 
 const STATUSES: StatusKey[] = ["O", "D", "N", "S"];
-const EMPTY_MODEL: FormModel = { date: "", rows: [], trailing: "O" };
+const EMPTY_MODEL: FormModel = {
+  date: "",
+  rows: [],
+  trailing: "O",
+  trailingUntil: "now",
+};
 
 export const LogEditForm = component$((props: LogEditFormProps) => {
   const draft = useSignal(props.log);
@@ -41,7 +49,7 @@ export const LogEditForm = component$((props: LogEditFormProps) => {
 
   const setModel = $((next: FormModel) => {
     model.value = next;
-    draft.value = formModelToLog(next);
+    draft.value = formModelToLog(next, { isToday: props.isToday });
     error.value = validateLog(draft.value);
   });
 
@@ -74,9 +82,34 @@ export const LogEditForm = component$((props: LogEditFormProps) => {
 
       <div class="min-h-0 flex-1 overflow-y-auto">
         {readOnly ? (
-          <pre class="whitespace-pre-wrap rounded-xl bg-slate-50 p-3 font-mono text-sm">
-            {props.log}
-          </pre>
+          error.value ? null : (
+            <ol class="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-800">
+              {model.value.rows.map((row, index) => (
+                <li key={index} class="flex flex-wrap items-center gap-2">
+                  <span class="w-12 text-slate-600">
+                    {index === 0 ? "Start" : "then"}
+                  </span>
+                  <span class="font-semibold">{STATUS_LABEL[row.status]}</span>
+                  <span class="text-slate-600">until</span>
+                  <span class="font-semibold tabular-nums">{row.until}</span>
+                </li>
+              ))}
+              <li class="flex flex-wrap items-center gap-2">
+                <span class="w-12 text-slate-600">
+                  {model.value.rows.length === 0 ? "Start" : "then"}
+                </span>
+                <span class="font-semibold">
+                  {STATUS_LABEL[model.value.trailing]}
+                </span>
+                <span class="text-slate-600">until</span>
+                <span class="font-semibold">
+                  {props.isToday && model.value.trailingUntil === "now"
+                    ? "now"
+                    : "end of day"}
+                </span>
+              </li>
+            </ol>
+          )
         ) : view.value === "raw" ? (
           <textarea
             class="h-48 w-full rounded-xl border border-slate-300 p-3 font-mono text-sm"
@@ -123,6 +156,14 @@ export const LogEditForm = component$((props: LogEditFormProps) => {
                 />
                 <button
                   type="button"
+                  class="rounded-lg px-2 py-1 text-sm text-blue-700 hover:bg-blue-50"
+                  aria-label={`Insert row before ${index + 1}`}
+                  onClick$={() => setModel(insertRowBefore(model.value, index))}
+                >
+                  Insert above
+                </button>
+                <button
+                  type="button"
                   class="rounded-lg px-2 py-1 text-sm text-red-700 hover:bg-red-50"
                   aria-label={`Remove row ${index + 1}`}
                   onClick$={() =>
@@ -159,22 +200,57 @@ export const LogEditForm = component$((props: LogEditFormProps) => {
                   </option>
                 ))}
               </select>
-              <span class="text-sm text-slate-600">until end of day</span>
+              <span class="text-sm text-slate-600">until</span>
+              {props.isToday ? (
+                <select
+                  class="rounded-lg border border-slate-300 px-2 py-1.5"
+                  aria-label="Final status until"
+                  value={model.value.trailingUntil}
+                  onChange$={(_, el) =>
+                    setModel({
+                      ...model.value,
+                      trailingUntil: el.value as "now" | "end",
+                    })
+                  }
+                >
+                  <option
+                    value="now"
+                    selected={model.value.trailingUntil === "now"}
+                  >
+                    now
+                  </option>
+                  <option
+                    value="end"
+                    selected={model.value.trailingUntil === "end"}
+                  >
+                    end of day
+                  </option>
+                </select>
+              ) : (
+                <span class="text-sm text-slate-600">end of day</span>
+              )}
+              <button
+                type="button"
+                class="rounded-lg px-2 py-1 text-sm text-blue-700 hover:bg-blue-50"
+                aria-label="Insert row before final status"
+                onClick$={() =>
+                  setModel(
+                    insertRowBefore(model.value, model.value.rows.length),
+                  )
+                }
+              >
+                Insert above
+              </button>
             </li>
             <li>
               <button
                 type="button"
                 class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                onClick$={() => {
-                  const last = model.value.rows.at(-1)?.until ?? "00:00";
-                  setModel({
-                    ...model.value,
-                    rows: [
-                      ...model.value.rows,
-                      { status: model.value.trailing, until: last },
-                    ],
-                  });
-                }}
+                onClick$={() =>
+                  setModel(
+                    insertRowBefore(model.value, model.value.rows.length),
+                  )
+                }
               >
                 Add row
               </button>
@@ -184,7 +260,10 @@ export const LogEditForm = component$((props: LogEditFormProps) => {
       </div>
 
       {error.value && (
-        <p role="alert" class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p
+          role="alert"
+          class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {error.value}
         </p>
       )}
