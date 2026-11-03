@@ -1,27 +1,16 @@
 import { component$, useComputed$, useSignal, $ } from "@qwik.dev/core";
-import type { QRL } from "@qwik.dev/core";
 import {
   STATUS_LABEL,
   createEmptyStatusDuration,
-  type DutyEntry,
   type StatusKey,
 } from "./hours-of-service";
-import {
-  addStatusAt,
-  clampNodeMinute,
-  formatMinute,
-  moveNode,
-  SNAP_MINUTES,
-  removeNode,
-  toLogText,
-  toTimelineIntervals,
-  type TimelineInterval,
-} from "./hos-timeline-edit";
+import { parseLogs } from "./hos-log-normalizer";
+import { toTimelineIntervals, type TimelineInterval } from "./timeline-intervals";
 
 interface HosTimelineProps {
-  entries: DutyEntry[];
+  /** Raw log text (the same string stored/edited elsewhere). */
+  log: string;
   cutoffMinute?: number;
-  onSave?: QRL<(logText: string) => Promise<boolean>>;
 }
 
 // Sleeper is not used right now, so it has no row.
@@ -85,30 +74,11 @@ export function buildTimelinePath(
     .join(" ");
 }
 
-function toSvgPoint(
-  svg: SVGSVGElement,
-  event: PointerEvent | MouseEvent,
-  width: number,
-  hourWidth: number,
-) {
-  const box = svg.getBoundingClientRect();
-  const scale = width / box.width;
-  return {
-    minute:
-      (((event.clientX - box.left) * scale - LABEL_WIDTH) / hourWidth) * 60,
-    y: (event.clientY - box.top) * scale,
-  };
-}
-
 interface TimelineSvgProps {
   intervals: TimelineInterval[];
   hourWidth: number;
   fit: boolean;
   cutoffMinute: number;
-  editable?: boolean;
-  onAdd?: QRL<(minute: number, status: StatusKey) => void>;
-  onRemove?: QRL<(index: number) => void>;
-  onMove?: QRL<(index: number, minute: number) => void>;
 }
 
 const TimelineSvg = component$((props: TimelineSvgProps) => {
@@ -117,22 +87,9 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
   const width = LABEL_WIDTH + hourWidth * 24 + TOTAL_WIDTH;
   const height = HEADER_HEIGHT + ROW_HEIGHT * ROWS.length + 4;
 
-  const hoverIndex = useSignal(-1);
-  const dragIndex = useSignal(-1);
-  const dragMinute = useSignal(0);
-
-  const view = useComputed$(() =>
-    dragIndex.value >= 0
-      ? moveNode(props.intervals, dragIndex.value, dragMinute.value)
-      : props.intervals,
-  );
-
   const totals = useComputed$(() =>
-    getTotalHundredths(getTotals(view.value, props.cutoffMinute)),
+    getTotalHundredths(getTotals(props.intervals, props.cutoffMinute)),
   );
-  const labelIndex = dragIndex.value >= 0 ? dragIndex.value : hoverIndex.value;
-  const labelInterval = labelIndex >= 0 ? view.value[labelIndex] : undefined;
-
   return (
     <svg
       width={props.fit ? "100%" : width}
@@ -140,33 +97,6 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label="24-hour duty status timeline"
-      style={props.editable ? { touchAction: "pan-x pan-y" } : undefined}
-      onPointerMove$={(event, svg) => {
-        if (dragIndex.value < 0) return;
-        const { minute } = toSvgPoint(
-          svg as unknown as SVGSVGElement,
-          event,
-          width,
-          hourWidth,
-        );
-        const latest = Math.max(
-          props.intervals[dragIndex.value].start + SNAP_MINUTES,
-          Math.floor(props.cutoffMinute / SNAP_MINUTES) * SNAP_MINUTES,
-        );
-        dragMinute.value = Math.min(
-          latest,
-          clampNodeMinute(props.intervals, dragIndex.value, minute),
-        );
-      }}
-      onPointerUp$={async () => {
-        const index = dragIndex.value;
-        if (index < 0) return;
-        const moved = dragMinute.value !== props.intervals[index].end;
-        dragIndex.value = -1;
-        if (moved) await props.onMove?.(index, dragMinute.value);
-        else await props.onRemove?.(index);
-      }}
-      onPointerCancel$={() => (dragIndex.value = -1)}
     >
       {ROWS.map((key, index) => (
         <g key={key}>
@@ -233,119 +163,33 @@ const TimelineSvg = component$((props: TimelineSvgProps) => {
         </g>
       ))}
       <path
-        d={buildTimelinePath(view.value, hourWidth, props.cutoffMinute)}
+        d={buildTimelinePath(props.intervals, hourWidth, props.cutoffMinute)}
         fill="none"
         class="stroke-blue-600"
         stroke-width={2.5}
         stroke-linejoin="miter"
       />
-      {props.editable && (
-        <rect
-          x={LABEL_WIDTH}
-          y={HEADER_HEIGHT}
-          width={hourWidth * 24}
-          height={ROW_HEIGHT * ROWS.length}
-          fill="transparent"
-          class="cursor-crosshair"
-          onClick$={async (event, rect) => {
-            const svg = (rect as unknown as SVGElement).ownerSVGElement!;
-            const { minute, y } = toSvgPoint(svg, event, width, hourWidth);
-            const row = Math.floor((y - HEADER_HEIGHT) / ROW_HEIGHT);
-            if (row < 0 || row >= ROWS.length || minute > props.cutoffMinute)
-              return;
-            await props.onAdd?.(minute, ROWS[row]);
-          }}
-        />
-      )}
-      {props.editable &&
-        view.value.map(
-          (interval, index) =>
-            index < view.value.length - 1 &&
-            isDrawn(interval) &&
-            interval.end < props.cutoffMinute && (
-              <circle
-                key={`node-${index}`}
-                cx={xAt(interval.end)}
-                cy={yOf(interval.status)}
-                r={6}
-                class="cursor-grab fill-white stroke-blue-600 hover:fill-blue-100"
-                stroke-width={2}
-                style={{ touchAction: "none" }}
-                onPointerEnter$={() => (hoverIndex.value = index)}
-                onPointerLeave$={() => (hoverIndex.value = -1)}
-                onPointerDown$={(event, circle) => {
-                  dragIndex.value = index;
-                  dragMinute.value = props.intervals[index].end;
-                  (
-                    circle as unknown as SVGElement
-                  ).ownerSVGElement?.setPointerCapture(event.pointerId);
-                }}
-              />
-            ),
-        )}
-      {labelInterval && isDrawn(labelInterval) && (
-        <g pointer-events="none">
-          <rect
-            x={xAt(labelInterval.end) - 22}
-            y={yOf(labelInterval.status) - 30}
-            width={44}
-            height={18}
-            rx={4}
-            class="fill-slate-900"
-          />
-          <text
-            x={xAt(labelInterval.end)}
-            y={yOf(labelInterval.status) - 17}
-            text-anchor="middle"
-            class="fill-white text-[11px] font-medium"
-          >
-            {formatMinute(labelInterval.end)}
-          </text>
-        </g>
-      )}
     </svg>
   );
 });
 
+function toIntervals(log: string): TimelineInterval[] {
+  try {
+    return toTimelineIntervals(parseLogs(log).value);
+  } catch {
+    return [];
+  }
+}
+
 export const HosTimeline = component$((props: HosTimelineProps) => {
   const isOpen = useSignal(false);
-  const draft = useSignal<TimelineInterval[]>([]);
-  const saveError = useSignal<string | null>(null);
-  const isSaving = useSignal(false);
-  const baseline = useSignal("");
-  const isEditing = useSignal(false);
   const zoom = useSignal(1);
-
-  const compactIntervals = useComputed$(() =>
-    toTimelineIntervals(props.entries),
-  );
-  const isDirty = useComputed$(() => toLogText(draft.value) !== baseline.value);
+  const intervals = useComputed$(() => toIntervals(props.log));
+  const cutoff = props.cutoffMinute ?? 1440;
 
   const open = $(() => {
-    draft.value = toTimelineIntervals(props.entries);
-    baseline.value = toLogText(draft.value);
-    saveError.value = null;
-    isEditing.value = false;
     zoom.value = 1;
     isOpen.value = true;
-  });
-
-  const save = $(async () => {
-    if (!props.onSave) return;
-    isSaving.value = true;
-    saveError.value = null;
-    try {
-      const saved = await props.onSave(toLogText(draft.value));
-      if (saved) isOpen.value = false;
-      else saveError.value = "The log could not be saved. Please try again.";
-    } catch (cause) {
-      saveError.value =
-        cause instanceof Error
-          ? `The log could not be saved: ${cause.message}`
-          : "The log could not be saved. Please try again.";
-    } finally {
-      isSaving.value = false;
-    }
   });
 
   return (
@@ -357,15 +201,15 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
         onClick$={open}
       >
         <TimelineSvg
-          intervals={compactIntervals.value}
+          intervals={intervals.value}
           hourWidth={COMPACT_HOUR_WIDTH}
-          cutoffMinute={props.cutoffMinute ?? 1440}
+          cutoffMinute={cutoff}
           fit
         />
       </button>
       {isOpen.value && (
         <div
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4"
           onClick$={() => (isOpen.value = false)}
         >
           <section
@@ -382,7 +226,7 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
               >
                 Timeline
               </h2>
-              <div class="flex flex-wrap justify-end gap-2">
+              <div class="flex gap-2">
                 <div class="flex items-center overflow-hidden rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700">
                   <button
                     type="button"
@@ -410,70 +254,21 @@ export const HosTimeline = component$((props: HosTimelineProps) => {
                     +
                   </button>
                 </div>
-                {props.onSave && (
-                  <button
-                    type="button"
-                    aria-pressed={isEditing.value}
-                    class={[
-                      "rounded-xl border px-4 py-2 text-sm font-semibold",
-                      isEditing.value
-                        ? "border-blue-600 bg-blue-50 text-blue-700"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-                    ]}
-                    onClick$={() => (isEditing.value = !isEditing.value)}
-                  >
-                    {isEditing.value ? "Editing" : "Edit"}
-                  </button>
-                )}
                 <button
                   type="button"
                   class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   onClick$={() => (isOpen.value = false)}
                 >
-                  {isDirty.value ? "Cancel" : "Close"}
+                  Close
                 </button>
-                {props.onSave && (
-                  <button
-                    type="button"
-                    class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                    disabled={!isDirty.value || isSaving.value}
-                    onClick$={save}
-                  >
-                    {isSaving.value ? "Saving..." : "Save"}
-                  </button>
-                )}
               </div>
             </div>
-            {props.onSave && isEditing.value && (
-              <p class="mb-3 text-sm text-slate-500">
-                Click a row to set a status at that time (15-minute steps),
-                click a node to remove it, or drag a node to change its time.
-              </p>
-            )}
-            {saveError.value && (
-              <p
-                role="alert"
-                class="mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
-              >
-                {saveError.value}
-              </p>
-            )}
             <div class="overflow-x-auto">
               <TimelineSvg
-                intervals={draft.value}
+                intervals={intervals.value}
                 hourWidth={FULL_HOUR_WIDTH * zoom.value}
-                cutoffMinute={props.cutoffMinute ?? 1440}
+                cutoffMinute={cutoff}
                 fit={false}
-                editable={Boolean(props.onSave) && isEditing.value}
-                onAdd={$((minute: number, status: StatusKey) => {
-                  draft.value = addStatusAt(draft.value, minute, status);
-                })}
-                onRemove={$((index: number) => {
-                  draft.value = removeNode(draft.value, index);
-                })}
-                onMove={$((index: number, minute: number) => {
-                  draft.value = moveNode(draft.value, index, minute);
-                })}
               />
             </div>
           </section>

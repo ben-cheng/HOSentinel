@@ -121,9 +121,8 @@ export const HosLog = component$((props: HosLogProps) => {
         <div>
           <h2 class="mb-3 text-base font-semibold text-slate-900">Breakdown</h2>
           <HosTimeline
-            entries={parsed.value.result.value}
+            log={props.HosRecord}
             cutoffMinute={cutoffMinute.value}
-            onSave={canEdit.value ? props.onSave : undefined}
           />
         </div>
       )}

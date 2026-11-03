@@ -1,7 +1,6 @@
 import { component$, $, useComputed$, useSignal } from "@qwik.dev/core";
 import type { QRL } from "@qwik.dev/core";
 import { HosTimeline } from "./hos-timeline";
-import { parseLogs } from "./hos-log-normalizer";
 import type { HosLogRecord } from "~/components/hos-log/hos-log-storage";
 
 interface HistoryLogPanelProps {
@@ -26,17 +25,6 @@ export const HistoryLogPanel = component$((props: HistoryLogPanelProps) => {
   const historicalLogs = useComputed$(() =>
     props.savedLogs.filter((record) => record.date <= props.maxDate),
   );
-  const entries = useComputed$(() => {
-    try {
-      return parseLogs(props.input, {
-        date: props.date,
-        now: new Date(),
-        expectedDate: props.date,
-      }).value;
-    } catch {
-      return [];
-    }
-  });
   const isBusy = useComputed$(() => props.isLoading || props.isSaving);
 
   const openLogDialog = $(() => {
@@ -131,8 +119,7 @@ export const HistoryLogPanel = component$((props: HistoryLogPanelProps) => {
         </button>
 
         <HosTimeline
-          entries={entries.value}
-          onSave={isBusy.value ? undefined : props.onSave}
+          log={props.input}
         />
       </div>
 

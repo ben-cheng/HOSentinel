@@ -199,9 +199,8 @@ export const TodayLogPanel = component$((props: TodayLogPanelProps) => {
           </h2>
           <div>
             <HosTimeline
-              entries={props.entries}
+              log={props.input}
               cutoffMinute={getTimelineCutoff(props.date, props.isDayComplete, props.now)}
-              onSave={isDisabled.value ? undefined : props.onSaveLog}
             />
           </div>
         </div>
