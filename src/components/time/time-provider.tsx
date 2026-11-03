@@ -1,9 +1,9 @@
 import { $, component$, createContextId, Slot, useComputed$, useContextProvider, useStore, useVisibleTask$ } from '@qwik.dev/core';
 import type { QRL } from '@qwik.dev/core';
-import { resolveTickInterval, type TickerRegistration } from './time-utils';
+import { msUntilNextBoundary, resolveTickInterval, type TickerRegistration } from './time-utils';
 
 export interface TimeContextValue {
-    /** Epoch milliseconds, refreshed at the fastest rate any mounted TimeTicker requests. */
+    /** Epoch milliseconds, refreshed at the fastest rate any mounted useNow() requests. */
     now: number;
     tickerRegistrations: TickerRegistration[];
     // Store members must be serializable, so these are QRLs that capture only
@@ -37,10 +37,16 @@ export const TimeProvider = component$(() => {
         const intervalMs = track(tickIntervalMs);
         if (intervalMs === null) return;
 
-        const timer = setInterval(() => {
-            time.now = Date.now();
-        }, intervalMs);
-        cleanup(() => clearInterval(timer));
+        let timer: ReturnType<typeof setTimeout>;
+        // Aim each tick at the next interval boundary so early/late firing self-corrects.
+        const schedule = () => {
+            timer = setTimeout(() => {
+                time.now = Date.now();
+                schedule();
+            }, msUntilNextBoundary(Date.now(), intervalMs));
+        };
+        schedule();
+        cleanup(() => clearTimeout(timer));
     }, { strategy: 'document-ready' });
 
     return <Slot />;

@@ -2,10 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { createDOM } from '@qwik.dev/core/testing';
 import { component$, useStore, useContext } from '@qwik.dev/core';
 import { TimeProvider, TimeContext } from './time-provider';
-import { TimeTicker } from './time-ticker';
+import { useNow } from './use-now';
 
 // Components live at module scope: inline component$ definitions can't be resolved by createDOM.
-const ShareTicker = component$(() => <TimeTicker intervalMs={1000} />);
+const ShareTicker = component$(() => {
+    useNow(1000);
+    return null;
+});
 
 const TickerStateProbe = component$(() => {
     const time = useContext(TimeContext);
@@ -17,7 +20,10 @@ const TickerStateProbe = component$(() => {
     );
 });
 
-const Fast = component$(() => <TimeTicker intervalMs={100} />);
+const Fast = component$(() => {
+    useNow(100);
+    return null;
+});
 
 const SpeedHarness = component$(() => {
     const ui = useStore({ showFast: true });
@@ -65,7 +71,7 @@ const Harness = component$(() => {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe('TimeTicker shared cleanup', () => {
+describe('useNow shared cleanup', () => {
     it('unregisters only the unmounted ticker and keeps the clock ticking for the remaining one', async () => {
         const { render, screen, userEvent } = await createDOM();
         await render(<Harness />);

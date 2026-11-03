@@ -17,3 +17,13 @@ export function resolveTickInterval(registrations: TickerRegistration[]): number
     if (registrations.length === 0) return null;
     return Math.min(...registrations.map((item) => item.intervalMs));
 }
+
+/** Rounds an epoch timestamp down to the start of its interval. */
+export function floorToInterval(timestamp: number, intervalMs: number): number {
+    return Math.floor(timestamp / intervalMs) * intervalMs;
+}
+
+/** Milliseconds from `timestamp` until the next interval boundary (always > 0). */
+export function msUntilNextBoundary(timestamp: number, intervalMs: number): number {
+    return intervalMs - (timestamp % intervalMs);
+}

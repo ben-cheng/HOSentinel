@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDisplayTime, resolveTickInterval } from './time-utils';
+import { floorToInterval, formatDisplayTime, msUntilNextBoundary, resolveTickInterval } from './time-utils';
 
 describe('formatDisplayTime()', () => {
     it('should format a timestamp into a human-readable string consistently', () => {
@@ -23,5 +23,18 @@ describe('resolveTickInterval()', () => {
                 { id: 'c', intervalMs: 5000 },
             ]),
         ).toBe(1000);
+    });
+});
+
+describe('interval boundaries', () => {
+    const at = Date.UTC(2026, 10, 2, 12, 30, 42);
+
+    it('floors to the start of the interval', () => {
+        expect(floorToInterval(at, 60_000)).toBe(Date.UTC(2026, 10, 2, 12, 30, 0));
+    });
+
+    it('computes the wait until the next boundary', () => {
+        expect(msUntilNextBoundary(at, 60_000)).toBe(18_000);
+        expect(msUntilNextBoundary(Date.UTC(2026, 10, 2, 12, 31, 0), 60_000)).toBe(60_000);
     });
 });
