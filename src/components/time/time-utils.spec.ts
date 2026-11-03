@@ -1,0 +1,27 @@
+import { describe, it, expect } from 'vitest';
+import { formatDisplayTime, resolveTickInterval } from './time-utils';
+
+describe('formatDisplayTime()', () => {
+    it('should format a timestamp into a human-readable string consistently', () => {
+        const mockTimestamp = Date.UTC(2026, 10, 2, 12, 30, 0); // 12:30 PM UTC
+        const result = formatDisplayTime(mockTimestamp);
+
+        expect(result).toBe('12:30 PM');
+    });
+});
+
+describe('resolveTickInterval()', () => {
+    it('returns null when no ticker is registered', () => {
+        expect(resolveTickInterval([])).toBeNull();
+    });
+
+    it('returns the fastest requested interval', () => {
+        expect(
+            resolveTickInterval([
+                { id: 'a', intervalMs: 60_000 },
+                { id: 'b', intervalMs: 1000 },
+                { id: 'c', intervalMs: 5000 },
+            ]),
+        ).toBe(1000);
+    });
+});
