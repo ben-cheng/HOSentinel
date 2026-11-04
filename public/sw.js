@@ -1,7 +1,10 @@
-const CACHE_NAME = "hosentinel-v3";
+const CACHE_NAME = "hosentinel-v4";
 const APP_SHELL_URL = new URL("./", self.registration.scope).href;
 const PRECACHE_URLS = [
   APP_SHELL_URL,
+  new URL("today/", APP_SHELL_URL).href,
+  new URL("history/", APP_SHELL_URL).href,
+  new URL("report/", APP_SHELL_URL).href,
   new URL("manifest.json", APP_SHELL_URL).href,
   new URL("app-icon.svg", APP_SHELL_URL).href,
   new URL("app-icon-192.png", APP_SHELL_URL).href,
@@ -77,7 +80,9 @@ async function handleNavigation(request) {
     response = await fetch(request);
   } catch (error) {
     const cachedPage =
-      (await caches.match(request)) ?? (await caches.match(APP_SHELL_URL));
+      (await caches.match(request)) ??
+      (await caches.match(new URL("today/", APP_SHELL_URL).href)) ??
+      (await caches.match(APP_SHELL_URL));
     if (cachedPage) return cachedPage;
     throw error;
   }

@@ -1,5 +1,5 @@
 import { component$, useComputed$, useVisibleTask$, useSignal, $ } from "@qwik.dev/core";
-import { Link, type DocumentHead } from "@qwik.dev/router";
+import { type DocumentHead } from "@qwik.dev/router";
 import { HistoryList } from "~/components/hos-log/history-list";
 import { buildHistoryItems } from "~/components/hos-log/history-items";
 import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
@@ -67,37 +67,20 @@ export default component$(() => {
   });
 
   return (
-    <div class="min-h-screen bg-linear-to-br from-slate-100 via-slate-50 to-blue-100 px-4 py-8 sm:px-6 lg:py-12">
-      <div class="mx-auto w-full max-w-4xl overflow-hidden rounded-3xl border border-white/80 bg-white shadow-xl shadow-slate-300/50">
-        <header class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/80 p-6">
-          <div>
-            <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-              HOSentinel
-            </p>
-            <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              Log history
-            </h1>
-          </div>
-          <Link
-            href="/"
-            class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Back to today
-          </Link>
-        </header>
-        <div class="space-y-4 p-6">
-          {storageError.value && (
-            <p role="alert" class="text-sm text-red-600">
-              Local storage error: {storageError.value}
-            </p>
-          )}
-          <HistoryList
-            items={items.value}
-            maxDate={maxDate}
-            onSave$={saveDay}
-          />
-        </div>
-      </div>
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold tracking-tight text-slate-900">
+        Log history
+      </h2>
+      {storageError.value && (
+        <p role="alert" class="text-sm text-red-600">
+          Local storage error: {storageError.value}
+        </p>
+      )}
+      <HistoryList
+        items={items.value}
+        maxDate={maxDate}
+        onSave$={saveDay}
+      />
     </div>
   );
 });
