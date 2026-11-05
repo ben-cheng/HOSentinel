@@ -4,7 +4,7 @@ import {
   getFinalStatus,
   parseLogs,
 } from "./hos-log-normalizer";
-import type { HosLogRecord } from "./hos-log-storage";
+import type { HosLogRecord } from "./context/hos-storage-provider";
 
 export interface HistoryItem {
   date: string;

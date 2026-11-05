@@ -1,9 +1,8 @@
-import { component$, useComputed$, useVisibleTask$, useSignal, $ } from "@qwik.dev/core";
+import { component$, useComputed$, useVisibleTask$, useSignal, $, useContext } from "@qwik.dev/core";
 import { type DocumentHead } from "@qwik.dev/router";
 import { HistoryList } from "~/components/hos-log/history-list";
 import { buildHistoryItems } from "~/components/hos-log/history-items";
-import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
-import { saveHosLog } from "~/components/hos-log/hos-log-storage";
+import { HosStorageContext } from "~/components/hos-log/context/hos-storage-provider";
 import {
   formatDailyLog,
   finalizeCompletedLogEntries,
@@ -15,7 +14,7 @@ import {
 } from "~/components/hos-log/date-utils";
 
 export default component$(() => {
-  const { savedLogs, refreshSavedLogs } = useStorageLogs();
+  const { savedLogs, refreshSavedLogs, saveLog } = useContext(HosStorageContext);
   const storageError = useSignal<string | null>(null);
   const maxDate = getPreviousLocalDateKey(getLocalDateKey(new Date()));
   const items = useComputed$(() => buildHistoryItems(savedLogs.value, maxDate));
@@ -51,7 +50,7 @@ export default component$(() => {
             existing.completedAt,
           )
         : parsed.canonicalEntries;
-      await saveHosLog({
+      await saveLog({
         date,
         logText: formatDailyLog(date, entries).replace(/\s/g, ""),
         updatedAt: new Date().toISOString(),

@@ -7,26 +7,22 @@ import {
   isServer,
   useContext,
 } from "@qwik.dev/core";
+import { HosStorageContext } from "~/components/hos-log/context/hos-storage-provider";
 import type { DocumentHead } from "@qwik.dev/router";
 import { HosContext } from "~/components/hos-log/hours-of-service";
-import type { DailyLog, LogEntry as DailyLogEntry } from "~/components/hos-log/hours-of-service";
-import {
-  isStatusKey,
-  STATUS_MAP,
+import type {
+  DailyLog,
+  LogEntry as DailyLogEntry,
 } from "~/components/hos-log/hours-of-service";
+import { isStatusKey, STATUS_MAP } from "~/components/hos-log/hours-of-service";
 import {
   formatDailyLog,
   parseLogs,
 } from "~/components/hos-log/hos-log-normalizer";
-import { getHosLog } from "~/components/hos-log/hos-log-storage";
 import { TodayLogView } from "~/components/hos-log/today-log-view";
 import { useNow } from "~/components/time/use-now";
 import { useTodayLog } from "~/components/hos-log/use-today-log";
-import { useStorageLogs } from "~/components/hos-log/use-storage-logs";
-import {
-  getLocalDateKey,
-  isToday,
-} from "~/components/hos-log/date-utils";
+import { getLocalDateKey, isToday } from "~/components/hos-log/date-utils";
 
 function toDailyLog(
   date: string,
@@ -60,15 +56,15 @@ export default component$(() => {
 
   // Use composable hooks for state management
   const todayLog = useTodayLog(now);
-  const { storageReady, refreshSavedLogs, getStartingStatus } =
-    useStorageLogs();
+  const { storageReady, refreshSavedLogs, getStartingStatus, getLog } =
+    useContext(HosStorageContext);
 
   // Update dailyLog context
   useTask$(({ track }) => {
     const date = track(() => todayLog.date.value);
     const logText = track(() => todayLog.input.value);
-    const completedAt = track(() =>
-      todayLog.loadedRecord.value?.completedAt ?? null
+    const completedAt = track(
+      () => todayLog.loadedRecord.value?.completedAt ?? null,
     );
     if (date) {
       try {
@@ -109,7 +105,7 @@ export default component$(() => {
       todayLog.date.value = today;
       try {
         await refreshSavedLogs();
-        const record = await getHosLog(today);
+        const record = await getLog(today);
         const carryStatus = record ? "O" : await getStartingStatus(today);
         const parsedRecord = record
           ? parseLogs(record.logText, {
@@ -123,10 +119,7 @@ export default component$(() => {
               now: new Date(),
               expectedDate: today,
             });
-        const displayLog = formatDailyLog(
-          today,
-          parsedRecord.canonicalEntries,
-        );
+        const displayLog = formatDailyLog(today, parsedRecord.canonicalEntries);
         todayLog.loadedRecord.value = record
           ? { ...record, logText: displayLog }
           : null;
@@ -154,10 +147,8 @@ export default component$(() => {
     todayLog.clearMessages();
     try {
       await refreshSavedLogs();
-      const record = await getHosLog(today);
-      const startingStatus = record
-        ? "O"
-        : await getStartingStatus(today);
+      const record = await getLog(today);
+      const startingStatus = record ? "O" : await getStartingStatus(today);
       const parsedRecord = record
         ? parseLogs(record.logText, {
             date: today,
@@ -249,23 +240,23 @@ export default component$(() => {
   });
 
   return (
-        <TodayLogView
-          now={now.value}
-          date={todayLog.date.value}
-          log={todayLog.input.value}
-          isComplete={todayLog.isDayComplete.value}
-          disabled={
-            !storageReady.value ||
-            todayLog.isLoadingDay.value ||
-            todayLog.isSaving.value
-          }
-          error={todayLog.error.value}
-          storageError={todayLog.storageError.value}
-          storageMessage={todayLog.storageMessage.value}
-          onChange$={applyStatusLog}
-          onSave$={saveEditedLog}
-          onSetComplete$={setDayComplete}
-        />
+    <TodayLogView
+      now={now.value}
+      date={todayLog.date.value}
+      log={todayLog.input.value}
+      isComplete={todayLog.isDayComplete.value}
+      disabled={
+        !storageReady.value ||
+        todayLog.isLoadingDay.value ||
+        todayLog.isSaving.value
+      }
+      error={todayLog.error.value}
+      storageError={todayLog.storageError.value}
+      storageMessage={todayLog.storageMessage.value}
+      onChange$={applyStatusLog}
+      onSave$={saveEditedLog}
+      onSetComplete$={setDayComplete}
+    />
   );
 });
 

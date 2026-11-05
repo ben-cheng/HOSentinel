@@ -1,8 +1,12 @@
-import { useSignal, useComputed$, useTask$, $ } from "@qwik.dev/core";
-import type { DutyEntry, StatusDuration, StatusKey } from "./hours-of-service";
 import {
-  createEmptyStatusDuration,
-} from "./hours-of-service";
+  useContext,
+  useSignal,
+  useComputed$,
+  useTask$,
+  $,
+} from "@qwik.dev/core";
+import type { DutyEntry, StatusDuration, StatusKey } from "./hours-of-service";
+import { createEmptyStatusDuration } from "./hours-of-service";
 import {
   formatDailyLog,
   getActiveDutyEntry,
@@ -13,8 +17,8 @@ import {
 } from "./hos-log-normalizer";
 import type { ParseResult } from "./hos-log-normalizer";
 import { updateLogForStatus } from "./hos-log-status-updater";
-import { saveHosLog } from "./hos-log-storage";
-import type { HosLogRecord } from "./hos-log-storage";
+import { HosStorageContext } from "./context/hos-storage-provider";
+import type { HosLogRecord } from "./context/hos-storage-provider";
 import { getMinuteOfDay } from "./date-utils";
 
 function getLocalDateKey(date: Date): string {
@@ -42,6 +46,7 @@ export interface TodayLogState {
 
 /** `now` is epoch ms from useNow(); the current minute derives from it. */
 export function useTodayLog(now: { readonly value: number }) {
+  const { saveLog } = useContext(HosStorageContext);
   const date = useSignal("");
   const input = useSignal("O");
   const result = useSignal<DutyEntry[]>([]);
@@ -169,7 +174,7 @@ export function useTodayLog(now: { readonly value: number }) {
           updatedAt: new Date().toISOString(),
           completedAt: savedCompletedAt,
         };
-        await saveHosLog(record);
+        await saveLog(record);
         if (date.value === dateStr) {
           input.value = displayLog;
           loadedRecord.value = { ...record, logText: displayLog };
