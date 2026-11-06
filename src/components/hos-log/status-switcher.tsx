@@ -39,7 +39,7 @@ export const StatusSwitcher = component$((props: StatusSwitcherProps) => {
   });
 
   return (
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-3 gap-2 sm:gap-3">
       {STATUS_OPTIONS.map((option) => (
         <StatusPanel
           key={option.status}

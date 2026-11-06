@@ -38,35 +38,49 @@ export const TodayLogView = component$((props: TodayLogViewProps) => {
   const locked = useComputed$(() => props.isComplete || !isCurrentDay.value);
 
   return (
-    <>
-      <section class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+    <div class="space-y-5">
+      <div>
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">
+          Today log
+        </h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Track your duty status and review today&apos;s timeline.
+        </p>
+      </div>
+
+      <section class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
         <div>
           <p class="text-xs font-bold uppercase tracking-wider text-slate-500">
             Today
           </p>
-          <h2 class="mt-1 text-lg font-semibold text-slate-900">
+          <h3 class="mt-1 text-lg font-semibold text-slate-900">
             {props.date
               ? new Date(`${props.date}T00:00:00`).toLocaleDateString()
               : ""}
-          </h2>
+          </h3>
         </div>
         <button
           type="button"
-          class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 disabled:opacity-50"
+          class="min-h-11 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={props.disabled || !isCurrentDay.value}
           onClick$={() => props.onSetComplete$(!props.isComplete)}
         >
           {props.isComplete ? "Reopen day" : "Close day"}
         </button>
-        <p class="w-full text-xs text-slate-500">
+        <p class="w-full text-sm text-slate-600">
           {props.isComplete
             ? "The day is closed. Remaining time is counted as Off-duty."
             : "Closing the day counts the remaining time as Off-duty."}
         </p>
       </section>
 
-      <section class="space-y-3">
-        <h2 class="text-base font-semibold text-slate-900">Duty status</h2>
+      <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/50 sm:p-5">
+        <div>
+          <h3 class="text-base font-semibold text-slate-900">Duty status</h3>
+          <p class="mt-1 text-sm text-slate-600">
+            Select a status to update your current log.
+          </p>
+        </div>
         <StatusSwitcher
           log={props.log}
           now={props.now}
@@ -75,13 +89,18 @@ export const TodayLogView = component$((props: TodayLogViewProps) => {
         />
       </section>
 
-      <section class="space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-base font-semibold text-slate-900">Timeline</h2>
+      <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/50 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-slate-900">Timeline</h3>
+            <p class="mt-1 text-sm text-slate-600">
+              Select the timeline to view it in detail.
+            </p>
+          </div>
           <div class="flex gap-2">
             <button
               type="button"
-              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              class="min-h-11 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={props.disabled}
               onClick$={() => {
                 dialog.value = "read";
@@ -91,7 +110,7 @@ export const TodayLogView = component$((props: TodayLogViewProps) => {
             </button>
             <button
               type="button"
-              class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-800 hover:bg-blue-100 disabled:opacity-50"
+              class="min-h-11 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={props.disabled}
               onClick$={() => {
                 dialog.value = "edit";
@@ -129,6 +148,6 @@ export const TodayLogView = component$((props: TodayLogViewProps) => {
           onClose$={closeDialog}
         />
       )}
-    </>
+    </div>
   );
 });

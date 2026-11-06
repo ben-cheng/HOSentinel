@@ -1,4 +1,11 @@
-import { component$, useComputed$, useVisibleTask$, useSignal, $, useContext } from "@qwik.dev/core";
+import {
+  component$,
+  useComputed$,
+  useVisibleTask$,
+  useSignal,
+  $,
+  useContext,
+} from "@qwik.dev/core";
 import { type DocumentHead } from "@qwik.dev/router";
 import { HistoryList } from "~/components/hos-log/history-list";
 import { buildHistoryItems } from "~/components/hos-log/history-items";
@@ -14,7 +21,8 @@ import {
 } from "~/components/hos-log/date-utils";
 
 export default component$(() => {
-  const { savedLogs, refreshSavedLogs, saveLog } = useContext(HosStorageContext);
+  const { savedLogs, refreshSavedLogs, saveLog } =
+    useContext(HosStorageContext);
   const storageError = useSignal<string | null>(null);
   const maxDate = getPreviousLocalDateKey(getLocalDateKey(new Date()));
   const items = useComputed$(() => buildHistoryItems(savedLogs.value, maxDate));
@@ -60,26 +68,29 @@ export default component$(() => {
       return true;
     } catch (cause) {
       storageError.value =
-        cause instanceof Error ? cause.message : "Failed to save this day's log.";
+        cause instanceof Error
+          ? cause.message
+          : "Failed to save this day's log.";
       return false;
     }
   });
 
   return (
-    <div class="space-y-4">
-      <h2 class="text-xl font-bold tracking-tight text-slate-900">
-        Log history
-      </h2>
+    <div class="space-y-6">
+      <div>
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">
+          Log history
+        </h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Select a past day to review its duty entries and timeline.
+        </p>
+      </div>
       {storageError.value && (
         <p role="alert" class="text-sm text-red-600">
           Local storage error: {storageError.value}
         </p>
       )}
-      <HistoryList
-        items={items.value}
-        maxDate={maxDate}
-        onSave$={saveDay}
-      />
+      <HistoryList items={items.value} maxDate={maxDate} onSave$={saveDay} />
     </div>
   );
 });

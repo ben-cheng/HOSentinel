@@ -15,7 +15,7 @@ export const STATUS_OPTIONS: Array<{
 
 function getStatusPanelClass(status: StatusKey, isActive: boolean): string {
   const base =
-    "relative flex min-h-36 w-full flex-col items-start justify-between rounded-2xl border p-3 text-left shadow-sm transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed sm:p-4";
+    "relative flex min-h-36 w-full flex-col items-start justify-between rounded-2xl border p-2 text-left shadow-sm transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed sm:p-4";
   const activeStyles: Record<StatusKey, string> = {
     O: "border-slate-300 bg-slate-100 text-slate-900 shadow-slate-200",
     S: "border-violet-200 bg-violet-50 text-violet-950 shadow-violet-100",
@@ -23,7 +23,7 @@ function getStatusPanelClass(status: StatusKey, isActive: boolean): string {
     N: "border-amber-200 bg-amber-50 text-amber-950 shadow-amber-100",
   };
   const inactiveStyles =
-    "border-slate-200 bg-slate-50 text-slate-500 opacity-65 hover:border-slate-300 hover:bg-white hover:opacity-100";
+    "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-white";
   return `${base} ${
     isActive ? `${activeStyles[status]} ring-2 ring-blue-200` : inactiveStyles
   }`;
@@ -104,7 +104,7 @@ export const StatusPanel = component$((props: StatusPanelProps) => {
         {props.label}
       </span>
       <span
-        class={`h-5 text-[0.65rem] font-medium text-slate-600 sm:text-xs ${
+        class={`h-5 whitespace-nowrap text-[0.65rem] font-medium text-slate-600 sm:text-xs ${
           isActive.value ? "" : "invisible"
         }`}
         aria-hidden={!isActive.value}

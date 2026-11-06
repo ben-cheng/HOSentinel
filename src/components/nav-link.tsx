@@ -30,7 +30,7 @@ export const NavLink = component$<NavLinkProps>(
             <Link
                 {...props}
                 class={[props.class, isActive && activeClass ? activeClass : ""]}
-
+                aria-current={isActive ? "page" : undefined}
             >
                 <Slot />
             </Link>
