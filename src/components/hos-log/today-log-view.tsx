@@ -13,12 +13,14 @@ interface TodayLogViewProps {
   log: string;
   isComplete: boolean;
   disabled: boolean;
+  loading?: boolean;
   error: string | null;
   storageError: string | null;
   storageMessage: string | null;
   onChange$: QRL<(log: string) => void>;
   onSave$: QRL<(log: string) => Promise<boolean>>;
   onSetComplete$: QRL<(completed: boolean) => Promise<boolean | void>>;
+  onRetry$?: QRL<() => void>;
 }
 
 export const TodayLogView = component$((props: TodayLogViewProps) => {
@@ -124,11 +126,21 @@ export const TodayLogView = component$((props: TodayLogViewProps) => {
       </section>
 
       <div class="min-h-6 text-sm" aria-live="polite">
+        {props.loading && <p class="text-slate-600">Loading today's log...</p>}
         {props.error && <p class="text-red-600">{props.error}</p>}
         {props.storageError && (
-          <p role="alert" class="text-red-600">
-            Local storage error: {props.storageError}
-          </p>
+          <div role="alert" class="space-y-2 text-red-600">
+            <p>Local storage error: {props.storageError}</p>
+            {props.onRetry$ && (
+              <button
+                type="button"
+                class="rounded-lg border border-red-300 px-3 py-2 font-semibold"
+                onClick$={props.onRetry$}
+              >
+                Reload today's log
+              </button>
+            )}
+          </div>
         )}
         {!props.storageError && props.storageMessage && (
           <p role="status" class="text-green-700">

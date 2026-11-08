@@ -57,6 +57,11 @@ reopening. Daily HOS logs are stored in this browser's IndexedDB by local
 calendar date, so saved logs can be reopened and edited offline. Data is local
 to this browser/device and is not synced to another device.
 
+Logs are loaded before editing is enabled. If loading fails, use the reload
+button to retry. If another tab changes a day after you opened it, saving is
+blocked to avoid overwriting the newer record; copy any unsaved edits, then
+reload the log and apply your changes again.
+
 The main view always shows today's log and duration breakdown. Use **View past
 logs** to open a historical day in a slide-over panel. Historical changes are
 saved with **Save changes** or abandoned with **Discard**; status quick-entry

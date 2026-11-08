@@ -36,7 +36,7 @@ function openDatabase(): Promise<IDBDatabase> {
   }
 
   if (!databasePromise) {
-    databasePromise = new Promise((resolve, reject) => {
+    databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
 
       request.onupgradeneeded = () => {
@@ -50,6 +50,9 @@ function openDatabase(): Promise<IDBDatabase> {
         reject(request.error ?? new Error("Failed to open HOS log storage."));
       request.onblocked = () =>
         reject(new Error("HOS log storage upgrade is blocked by another tab."));
+    }).catch((error: unknown) => {
+      databasePromise = undefined;
+      throw error;
     });
   }
 
@@ -97,21 +100,50 @@ async function listHosLogs(): Promise<HosLogRecord[]> {
   });
 }
 
-async function saveHosLog(record: HosLogRecord): Promise<void> {
+async function saveHosLog(
+  record: HosLogRecord,
+  expectedUpdatedAt: string | null,
+): Promise<HosLogRecord> {
   const database = await openDatabase();
 
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<HosLogRecord>((resolve, reject) => {
     const transaction = database.transaction(LOG_STORE, "readwrite");
-    transaction.objectStore(LOG_STORE).put(record);
-    transaction.oncomplete = () => resolve();
+    const store = transaction.objectStore(LOG_STORE);
+    const request = store.get(record.date);
+    let saved: HosLogRecord | undefined;
+    let conflict = false;
+    request.onsuccess = () => {
+      const current = request.result as HosLogRecord | undefined;
+      if ((current?.updatedAt ?? null) !== expectedUpdatedAt) {
+        conflict = true;
+        transaction.abort();
+        return;
+      }
+      const previousTime = current ? Date.parse(current.updatedAt) : 0;
+      const timestamp = Math.max(
+        Date.now(),
+        Number.isFinite(previousTime) ? previousTime + 1 : 0,
+      );
+      saved = { ...record, updatedAt: new Date(timestamp).toISOString() };
+      store.put(saved);
+    };
+    transaction.oncomplete = () => resolve(saved!);
     transaction.onerror = () =>
       reject(
-        transaction.error ??
+        (conflict
+          ? new Error(
+              `The log for ${record.date} changed in another session. Reload it before saving.`,
+            )
+          : transaction.error) ??
           new Error(`Failed to save the HOS log for ${record.date}.`),
       );
     transaction.onabort = () =>
       reject(
-        transaction.error ??
+        (conflict
+          ? new Error(
+              `The log for ${record.date} changed in another session. Reload it before saving.`,
+            )
+          : transaction.error) ??
           new Error(`Failed to save the HOS log for ${record.date}.`),
       );
   });
@@ -120,14 +152,19 @@ async function saveHosLog(record: HosLogRecord): Promise<void> {
 export interface HosStorageContextValue {
   /** Saved daily logs, newest first. */
   savedLogs: Signal<HosLogRecord[]>;
-  /** True once the first load from IndexedDB has finished (or failed). */
+  /** True once logs have been successfully loaded from IndexedDB. */
   storageReady: Signal<boolean>;
   /** Re-reads IndexedDB, normalizes records and updates `savedLogs`. */
   refreshSavedLogs: QRL<() => Promise<HosLogRecord[]>>;
   /** Reads one day straight from IndexedDB (null when not saved). */
   getLog: QRL<(date: string) => Promise<HosLogRecord | null>>;
   /** Writes one day to IndexedDB and updates `savedLogs`. */
-  saveLog: QRL<(record: HosLogRecord) => Promise<void>>;
+  saveLog: QRL<
+    (
+      record: HosLogRecord,
+      expectedUpdatedAt: string | null,
+    ) => Promise<HosLogRecord>
+  >;
   /** Final status of the latest saved day before `date` ("O" when none). */
   getStartingStatus: QRL<(date: string) => string>;
 }
@@ -147,21 +184,13 @@ function normalizeRecord(record: HosLogRecord, now: Date): HosLogRecord {
     ? finalizeCompletedLogEntries(parsed.canonicalEntries, record.completedAt)
     : parsed.canonicalEntries;
   const logText = formatDailyLog(parsed.date, entries).replace(/\s/g, "");
-  return logText === record.logText
-    ? record
-    : { ...record, logText, updatedAt: now.toISOString() };
+  return logText === record.logText ? record : { ...record, logText };
 }
 
 async function loadNormalizedRecords(): Promise<HosLogRecord[]> {
   const now = new Date();
   const stored = await listHosLogs();
-  return Promise.all(
-    stored.map(async (record) => {
-      const normalized = normalizeRecord(record, now);
-      if (normalized !== record) await saveHosLog(normalized);
-      return normalized;
-    }),
-  );
+  return stored.map((record) => normalizeRecord(record, now));
 }
 
 export const HosStorageProvider = component$(() => {
@@ -171,6 +200,7 @@ export const HosStorageProvider = component$(() => {
   const refreshSavedLogs = $(async () => {
     const records = await loadNormalizedRecords();
     savedLogs.value = records;
+    storageReady.value = true;
     return records;
   });
 
@@ -187,13 +217,16 @@ export const HosStorageProvider = component$(() => {
 
   const getLog = $((date: string) => getHosLog(date));
 
-  const saveLog = $(async (record: HosLogRecord) => {
-    await saveHosLog(record);
-    savedLogs.value = [
-      record,
-      ...savedLogs.value.filter((item) => item.date !== record.date),
-    ].sort((a, b) => b.date.localeCompare(a.date));
-  });
+  const saveLog = $(
+    async (record: HosLogRecord, expectedUpdatedAt: string | null) => {
+      const saved = await saveHosLog(record, expectedUpdatedAt);
+      savedLogs.value = [
+        saved,
+        ...savedLogs.value.filter((item) => item.date !== record.date),
+      ].sort((a, b) => b.date.localeCompare(a.date));
+      return saved;
+    },
+  );
 
   useContextProvider(HosStorageContext, {
     savedLogs,
@@ -210,10 +243,9 @@ export const HosStorageProvider = component$(() => {
     async () => {
       try {
         savedLogs.value = await loadNormalizedRecords();
+        storageReady.value = true;
       } catch (error) {
         console.error("Failed to initialize storage:", error);
-      } finally {
-        storageReady.value = true;
       }
     },
     { strategy: "document-ready" },

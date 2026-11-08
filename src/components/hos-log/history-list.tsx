@@ -10,7 +10,15 @@ interface HistoryListProps {
   items: HistoryItem[];
   /** Latest selectable date (yesterday); also the default selection. */
   maxDate: string;
-  onSave$: QRL<(date: string, log: string) => Promise<boolean>>;
+  onSave$: QRL<
+    (
+      date: string,
+      log: string,
+      updatedAt: string | null,
+      completedAt: string | null,
+    ) => Promise<boolean>
+  >;
+  disabled?: boolean;
 }
 
 function toDate(date: string): Date {
@@ -24,6 +32,7 @@ function formatDate(date: string): string {
 export const HistoryList = component$((props: HistoryListProps) => {
   const selectedDate = useSignal(props.maxDate);
   const isEditing = useSignal(false);
+  const editingItem = useSignal<HistoryItem | null>(null);
 
   const item = useComputed$<HistoryItem>(() => {
     const found = props.items.find(
@@ -50,8 +59,18 @@ export const HistoryList = component$((props: HistoryListProps) => {
   });
   const closeEditor = $(() => {
     isEditing.value = false;
+    editingItem.value = null;
   });
-  const save = $((log: string) => props.onSave$(selectedDate.value, log));
+  const save = $((log: string) => {
+    const editing = editingItem.value;
+    if (!editing || props.disabled) return Promise.resolve(false);
+    return props.onSave$(
+      editing.date,
+      log,
+      editing.updatedAt ?? null,
+      editing.completedAt ?? null,
+    );
+  });
 
   return (
     <div class="space-y-5">
@@ -129,8 +148,10 @@ export const HistoryList = component$((props: HistoryListProps) => {
           </div>
           <button
             type="button"
+            disabled={props.disabled}
             class="min-h-11 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             onClick$={() => {
+              editingItem.value = item.value;
               isEditing.value = true;
             }}
           >
@@ -143,10 +164,10 @@ export const HistoryList = component$((props: HistoryListProps) => {
         <LogEditForm log={item.value.log} mode="read" />
       </section>
 
-      {isEditing.value && (
+      {isEditing.value && editingItem.value && (
         <LogDialog
-          title={formatDate(item.value.date)}
-          log={item.value.log}
+          title={formatDate(editingItem.value.date)}
+          log={editingItem.value.log}
           mode="edit"
           onSave$={save}
           onClose$={closeEditor}

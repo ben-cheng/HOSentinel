@@ -22,7 +22,9 @@ export const LogDialog = component$((props: LogDialogProps) => {
     try {
       const saved = await props.onSave$?.(log);
       if (saved) await props.onClose$();
-      else saveError.value = "The log could not be saved. Please try again.";
+      else
+        saveError.value =
+          "The log could not be saved. Copy any changes you need, then close this dialog and reload the log before trying again.";
     } catch (cause) {
       saveError.value =
         cause instanceof Error ? cause.message : "The log could not be saved.";

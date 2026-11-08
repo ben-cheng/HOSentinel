@@ -56,7 +56,7 @@ export default component$(() => {
 
   // Use composable hooks for state management
   const todayLog = useTodayLog(now);
-  const { storageReady, refreshSavedLogs, getStartingStatus, getLog } =
+  const { storageReady, refreshSavedLogs, getStartingStatus, getLog, saveLog } =
     useContext(HosStorageContext);
 
   // Update dailyLog context
@@ -96,58 +96,14 @@ export default component$(() => {
     }
   });
 
-  // Load today's log on mount
-  // Runs on mount, including client-side navigation (window "load" would not).
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(
-    async () => {
-      const today = getLocalDateKey(new Date());
-      todayLog.date.value = today;
-      try {
-        await refreshSavedLogs();
-        const record = await getLog(today);
-        const carryStatus = record ? "O" : await getStartingStatus(today);
-        const parsedRecord = record
-          ? parseLogs(record.logText, {
-              date: today,
-              now: new Date(),
-              completedAt: record.completedAt,
-              expectedDate: today,
-            })
-          : parseLogs(carryStatus, {
-              date: today,
-              now: new Date(),
-              expectedDate: today,
-            });
-        const displayLog = formatDailyLog(today, parsedRecord.canonicalEntries);
-        todayLog.loadedRecord.value = record
-          ? { ...record, logText: displayLog }
-          : null;
-        todayLog.input.value = displayLog;
-        if (!record) {
-          await todayLog.persistLog(today, carryStatus);
-        }
-      } catch (cause) {
-        await todayLog.showSaveError(
-          cause instanceof Error
-            ? cause.message
-            : "Failed to open local HOS log storage.",
-        );
-      }
-    },
-    { strategy: "document-ready" },
-  );
-
-  // Roll over to today if date changed
-  const rollOverToToday = $(async () => {
+  const loadToday = $(async () => {
     const today = getLocalDateKey(new Date());
-    if (todayLog.date.value === today || todayLog.isLoadingDay.value) return;
-
     todayLog.isLoadingDay.value = true;
+    todayLog.dayReady.value = false;
     todayLog.clearMessages();
     try {
       await refreshSavedLogs();
-      const record = await getLog(today);
+      let record = await getLog(today);
       const startingStatus = record ? "O" : await getStartingStatus(today);
       const parsedRecord = record
         ? parseLogs(record.logText, {
@@ -162,14 +118,23 @@ export default component$(() => {
             expectedDate: today,
           });
       const displayLog = formatDailyLog(today, parsedRecord.canonicalEntries);
-      todayLog.date.value = today;
-      todayLog.loadedRecord.value = record
-        ? { ...record, logText: displayLog }
-        : null;
-      todayLog.input.value = displayLog;
       if (!record) {
-        await todayLog.persistLog(today, startingStatus);
+        record = await saveLog(
+          {
+            date: today,
+            logText: displayLog.replace(/\s/g, ""),
+            updatedAt: new Date().toISOString(),
+            completedAt: null,
+          },
+          null,
+        );
       }
+      if (!isToday(today))
+        throw new Error("The date changed while loading. Please retry.");
+      todayLog.date.value = today;
+      todayLog.loadedRecord.value = { ...record, logText: displayLog };
+      todayLog.input.value = displayLog;
+      todayLog.dayReady.value = true;
     } catch (cause) {
       await todayLog.showSaveError(
         cause instanceof Error ? cause.message : "Failed to load today's log.",
@@ -179,19 +144,38 @@ export default component$(() => {
     }
   });
 
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    () => {
+      loadToday();
+    },
+    { strategy: "document-ready" },
+  );
+
   // Watch for date changes
   useTask$(({ track }) => {
     const today = track(() => currentDate.value);
     const selected = track(() => todayLog.date.value);
     const ready = track(() => storageReady.value);
-    if (!isServer && ready && selected && selected !== today) {
-      rollOverToToday();
+    if (
+      !isServer &&
+      ready &&
+      selected &&
+      selected !== today &&
+      !todayLog.isLoadingDay.value
+    ) {
+      loadToday();
     }
   });
 
   // Save edited log
   const saveEditedLog = $(async (logText: string) => {
-    if (!todayLog.date.value) return false;
+    if (
+      !todayLog.dayReady.value ||
+      todayLog.isLoadingDay.value ||
+      !isToday(todayLog.date.value)
+    )
+      return false;
     const previousCompletedAt =
       todayLog.loadedRecord.value?.date === todayLog.date.value
         ? (todayLog.loadedRecord.value.completedAt ?? null)
@@ -209,6 +193,8 @@ export default component$(() => {
   const setDayComplete = $(async (completed: boolean) => {
     if (
       !todayLog.date.value ||
+      !todayLog.dayReady.value ||
+      todayLog.isLoadingDay.value ||
       !isToday(todayLog.date.value) ||
       todayLog.isSaving.value
     ) {
@@ -230,12 +216,14 @@ export default component$(() => {
 
   // Status switcher emits the full updated log
   const applyStatusLog = $(async (logText: string) => {
-    if (todayLog.loadedRecord.value?.completedAt) return;
-    if (!isToday(todayLog.date.value)) {
-      await rollOverToToday();
-      if (todayLog.storageError.value) return;
-    }
-    todayLog.input.value = logText;
+    if (
+      !todayLog.dayReady.value ||
+      todayLog.isLoadingDay.value ||
+      todayLog.isSaving.value ||
+      !isToday(todayLog.date.value) ||
+      todayLog.loadedRecord.value?.completedAt
+    )
+      return;
     await todayLog.persistLog(todayLog.date.value, logText);
   });
 
@@ -247,6 +235,7 @@ export default component$(() => {
       isComplete={todayLog.isDayComplete.value}
       disabled={
         !storageReady.value ||
+        !todayLog.dayReady.value ||
         todayLog.isLoadingDay.value ||
         todayLog.isSaving.value
       }
@@ -256,6 +245,8 @@ export default component$(() => {
       onChange$={applyStatusLog}
       onSave$={saveEditedLog}
       onSetComplete$={setDayComplete}
+      onRetry$={loadToday}
+      loading={todayLog.isLoadingDay.value}
     />
   );
 });

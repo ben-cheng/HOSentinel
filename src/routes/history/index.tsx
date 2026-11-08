@@ -24,56 +24,80 @@ export default component$(() => {
   const { savedLogs, refreshSavedLogs, saveLog } =
     useContext(HosStorageContext);
   const storageError = useSignal<string | null>(null);
+  const loading = useSignal(true);
+  const historyReady = useSignal(false);
+  const historyLoaded = useSignal(false);
   const maxDate = getPreviousLocalDateKey(getLocalDateKey(new Date()));
   const items = useComputed$(() => buildHistoryItems(savedLogs.value, maxDate));
 
-  // Runs on mount, including client-side navigation (window "load" would not).
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(
-    async () => {
-      try {
-        await refreshSavedLogs();
-      } catch (cause) {
-        storageError.value =
-          cause instanceof Error
-            ? cause.message
-            : "Failed to open local HOS log storage.";
-      }
-    },
-    { strategy: "document-ready" },
-  );
-
-  const saveDay = $(async (date: string, log: string) => {
-    if (!date || date >= getLocalDateKey(new Date())) return false;
+  const loadHistory = $(async () => {
+    loading.value = true;
+    historyReady.value = false;
+    storageError.value = null;
     try {
-      const existing = savedLogs.value.find((record) => record.date === date);
-      const parsed = parseLogs(log, {
-        date,
-        completedAt: existing?.completedAt,
-        expectedDate: date,
-      });
-      const entries = existing?.completedAt
-        ? finalizeCompletedLogEntries(
-            parsed.canonicalEntries,
-            existing.completedAt,
-          )
-        : parsed.canonicalEntries;
-      await saveLog({
-        date,
-        logText: formatDailyLog(date, entries).replace(/\s/g, ""),
-        updatedAt: new Date().toISOString(),
-        completedAt: existing?.completedAt ?? null,
-      });
       await refreshSavedLogs();
-      return true;
+      historyReady.value = true;
+      historyLoaded.value = true;
     } catch (cause) {
       storageError.value =
         cause instanceof Error
           ? cause.message
-          : "Failed to save this day's log.";
-      return false;
+          : "Failed to open local HOS log storage.";
+    } finally {
+      loading.value = false;
     }
   });
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    () => {
+      loadHistory();
+    },
+    { strategy: "document-ready" },
+  );
+
+  const saveDay = $(
+    async (
+      date: string,
+      log: string,
+      expectedUpdatedAt: string | null,
+      completedAt: string | null,
+    ) => {
+      if (
+        !historyReady.value ||
+        loading.value ||
+        !date ||
+        date >= getLocalDateKey(new Date())
+      )
+        return false;
+      try {
+        const parsed = parseLogs(log, {
+          date,
+          completedAt,
+          expectedDate: date,
+        });
+        const entries = completedAt
+          ? finalizeCompletedLogEntries(parsed.canonicalEntries, completedAt)
+          : parsed.canonicalEntries;
+        await saveLog(
+          {
+            date,
+            logText: formatDailyLog(date, entries).replace(/\s/g, ""),
+            updatedAt: new Date().toISOString(),
+            completedAt,
+          },
+          expectedUpdatedAt,
+        );
+        return true;
+      } catch (cause) {
+        historyReady.value = false;
+        storageError.value =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to save this day's log.";
+        return false;
+      }
+    },
+  );
 
   return (
     <div class="space-y-6">
@@ -86,11 +110,30 @@ export default component$(() => {
         </p>
       </div>
       {storageError.value && (
-        <p role="alert" class="text-sm text-red-600">
-          Local storage error: {storageError.value}
+        <div role="alert" class="space-y-2 text-sm text-red-600">
+          <p>Local storage error: {storageError.value}</p>
+          <button
+            type="button"
+            class="rounded-lg border border-red-300 px-3 py-2 font-semibold"
+            onClick$={loadHistory}
+          >
+            Reload history
+          </button>
+        </div>
+      )}
+      {loading.value && (
+        <p role="status" class="text-sm text-slate-600">
+          Loading history...
         </p>
       )}
-      <HistoryList items={items.value} maxDate={maxDate} onSave$={saveDay} />
+      {historyLoaded.value && (
+        <HistoryList
+          items={items.value}
+          maxDate={maxDate}
+          onSave$={saveDay}
+          disabled={!historyReady.value || loading.value}
+        />
+      )}
     </div>
   );
 });

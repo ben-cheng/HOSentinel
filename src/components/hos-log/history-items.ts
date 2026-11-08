@@ -11,6 +11,8 @@ export interface HistoryItem {
   /** Raw log text for the day (carried-over status when nothing was saved). */
   log: string;
   hasRecord: boolean;
+  updatedAt?: string;
+  completedAt?: string | null;
 }
 
 /**
@@ -43,10 +45,18 @@ export function buildHistoryItems(
         date,
         log: formatDailyLog(date, parsed.canonicalEntries),
         hasRecord: !!record,
+        updatedAt: record?.updatedAt,
+        completedAt: record?.completedAt,
       });
       carry = getFinalStatus(parsed.value);
     } catch {
-      items.push({ date, log: record?.logText ?? "", hasRecord: !!record });
+      items.push({
+        date,
+        log: record?.logText ?? "",
+        hasRecord: !!record,
+        updatedAt: record?.updatedAt,
+        completedAt: record?.completedAt,
+      });
       carry = "O";
     }
   }

@@ -32,3 +32,19 @@ test("shows the selected day and switches details using a week shortcut", async 
   expect(screen.querySelector("ol")?.textContent).not.toContain("06:30");
   expect(screen.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
 });
+
+test("disables editing while history is unavailable", async () => {
+  const { render, screen } = await createDOM();
+  await render(
+    <HistoryList
+      maxDate="2026-10-13"
+      items={[]}
+      disabled
+      onSave$={$(async () => true)}
+    />,
+  );
+  const edit = Array.from(screen.querySelectorAll("button")).find(
+    (button) => button.textContent === "Edit log",
+  );
+  expect(edit?.hasAttribute("disabled")).toBe(true);
+});

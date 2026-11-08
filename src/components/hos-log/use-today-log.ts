@@ -59,7 +59,8 @@ export function useTodayLog(now: { readonly value: number }) {
   const loadedRecord = useSignal<HosLogRecord | null>(null);
   const currentMinute = useComputed$(() => getMinuteOfDay(new Date(now.value)));
   const isSaving = useSignal(false);
-  const isLoadingDay = useSignal(false);
+  const isLoadingDay = useSignal(true);
+  const dayReady = useSignal(false);
   const pendingStatusEntries = useSignal<StatusKey[]>([]);
   const isProcessingStatusEntries = useSignal(false);
 
@@ -129,6 +130,12 @@ export function useTodayLog(now: { readonly value: number }) {
       if (isSaving.value) return false;
 
       clearMessages();
+      if (!dayReady.value || isLoadingDay.value || dateStr !== date.value) {
+        await showSaveError(
+          "The day's log is not loaded. Reload it before saving.",
+        );
+        return false;
+      }
       if (dateStr !== getLocalDateKey(new Date())) {
         await showSaveError("Past-day logs are read-only.");
         return false;
@@ -174,14 +181,18 @@ export function useTodayLog(now: { readonly value: number }) {
           updatedAt: new Date().toISOString(),
           completedAt: savedCompletedAt,
         };
-        await saveLog(record);
+        const saved = await saveLog(
+          record,
+          loadedRecord.value?.updatedAt ?? null,
+        );
         if (date.value === dateStr) {
           input.value = displayLog;
-          loadedRecord.value = { ...record, logText: displayLog };
+          loadedRecord.value = { ...saved, logText: displayLog };
           showSaveSuccess();
         }
         return true;
       } catch (cause) {
+        dayReady.value = false;
         await showSaveError(
           cause instanceof Error
             ? cause.message
@@ -207,14 +218,12 @@ export function useTodayLog(now: { readonly value: number }) {
       while (pendingStatusEntries.value.length > 0) {
         const status = pendingStatusEntries.value[0];
 
-        if (isLoadingDay.value || isSaving.value) break;
+        if (!dayReady.value || isLoadingDay.value || isSaving.value) break;
 
         pendingStatusEntries.value = pendingStatusEntries.value.slice(1);
 
         const updatedLog = updateLogForStatus(input.value, status, new Date());
         if (updatedLog === input.value) continue;
-        input.value = updatedLog;
-
         const completedAt =
           loadedRecord.value?.date === date.value
             ? (loadedRecord.value.completedAt ?? null)
@@ -239,6 +248,7 @@ export function useTodayLog(now: { readonly value: number }) {
     currentMinute,
     isSaving,
     isLoadingDay,
+    dayReady,
     pendingStatusEntries,
     isProcessingStatusEntries,
     // Computed

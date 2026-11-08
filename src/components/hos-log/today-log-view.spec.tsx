@@ -35,3 +35,25 @@ test("shows current status and opens the log details", async () => {
   await userEvent(details!, "click");
   expect(screen.querySelector('[role="dialog"]')?.textContent).toContain("06:30");
 });
+
+test("disables changes while today's log is loading", async () => {
+  const { render, screen } = await createDOM();
+  await render(
+    <TodayLogView
+      now={new Date(2026, 9, 13, 8).getTime()}
+      date="2026-10-13"
+      log="O"
+      isComplete={false}
+      disabled
+      loading
+      error={null}
+      storageError={null}
+      storageMessage={null}
+      onChange$={$(() => {})}
+      onSave$={$(async () => true)}
+      onSetComplete$={$(async () => true)}
+    />,
+  );
+  expect(screen.textContent).toContain("Loading today's log");
+  expect(screen.querySelectorAll("button[disabled]")).toHaveLength(6);
+});
