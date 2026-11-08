@@ -100,6 +100,13 @@ async function listHosLogs(): Promise<HosLogRecord[]> {
   });
 }
 
+function nextUpdatedAt(current?: HosLogRecord): string {
+  const previousTime = current ? Date.parse(current.updatedAt) : 0;
+  return new Date(
+    Math.max(Date.now(), Number.isFinite(previousTime) ? previousTime + 1 : 0),
+  ).toISOString();
+}
+
 async function saveHosLog(
   record: HosLogRecord,
   expectedUpdatedAt: string | null,
@@ -119,12 +126,7 @@ async function saveHosLog(
         transaction.abort();
         return;
       }
-      const previousTime = current ? Date.parse(current.updatedAt) : 0;
-      const timestamp = Math.max(
-        Date.now(),
-        Number.isFinite(previousTime) ? previousTime + 1 : 0,
-      );
-      saved = { ...record, updatedAt: new Date(timestamp).toISOString() };
+      saved = { ...record, updatedAt: nextUpdatedAt(current) };
       store.put(saved);
     };
     transaction.oncomplete = () => resolve(saved!);
@@ -149,6 +151,47 @@ async function saveHosLog(
   });
 }
 
+async function importHosLogs(
+  records: HosLogRecord[],
+  approvedDates: string[],
+): Promise<{ conflicts: string[]; imported: HosLogRecord[] }> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(LOG_STORE, "readwrite");
+    const store = transaction.objectStore(LOG_STORE);
+    const conflicts: string[] = [];
+    const existing = new Map<string, HosLogRecord>();
+    let imported: HosLogRecord[] = [];
+    let remaining = records.length;
+    for (const record of records) {
+      const request = store.get(record.date);
+      request.onsuccess = () => {
+        const current = request.result as HosLogRecord | undefined;
+        if (current) existing.set(record.date, current);
+        if (
+          current !== undefined &&
+          !approvedDates.includes(record.date)
+        ) {
+          conflicts.push(record.date);
+        }
+        remaining--;
+        if (remaining === 0 && conflicts.length === 0) {
+          imported = records.map((item) => ({
+            ...item,
+            updatedAt: nextUpdatedAt(existing.get(item.date)),
+          }));
+          for (const item of imported) store.put(item);
+        }
+      };
+    }
+    transaction.oncomplete = () => resolve({ conflicts: conflicts.sort(), imported });
+    transaction.onerror = () =>
+      reject(transaction.error ?? new Error("Failed to import HOS logs."));
+    transaction.onabort = () =>
+      reject(transaction.error ?? new Error("Import of HOS logs was aborted."));
+  });
+}
+
 export interface HosStorageContextValue {
   /** Saved daily logs, newest first. */
   savedLogs: Signal<HosLogRecord[]>;
@@ -164,6 +207,10 @@ export interface HosStorageContextValue {
       record: HosLogRecord,
       expectedUpdatedAt: string | null,
     ) => Promise<HosLogRecord>
+  >;
+  /** Atomically imports records or returns conflicts without writing anything. */
+  importLogs: QRL<
+    (records: HosLogRecord[], approvedDates: string[]) => Promise<string[]>
   >;
   /** Final status of the latest saved day before `date` ("O" when none). */
   getStartingStatus: QRL<(date: string) => string>;
@@ -228,12 +275,30 @@ export const HosStorageProvider = component$(() => {
     },
   );
 
+  const importLogs = $(
+    async (records: HosLogRecord[], approvedDates: string[]) => {
+      if (!records.length) throw new Error("No records to import.");
+      const { conflicts, imported } = await importHosLogs(records, approvedDates);
+      if (!conflicts.length) {
+        const importedDates = new Set(imported.map((record) => record.date));
+        savedLogs.value = [
+          ...imported,
+          ...savedLogs.value.filter(
+            (record) => !importedDates.has(record.date),
+          ),
+        ].sort((a, b) => b.date.localeCompare(a.date));
+      }
+      return conflicts;
+    },
+  );
+
   useContextProvider(HosStorageContext, {
     savedLogs,
     storageReady,
     refreshSavedLogs,
     getLog,
     saveLog,
+    importLogs,
     getStartingStatus,
   });
 

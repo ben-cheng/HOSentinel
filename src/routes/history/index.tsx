@@ -8,6 +8,7 @@ import {
 } from "@qwik.dev/core";
 import { type DocumentHead } from "@qwik.dev/router";
 import { HistoryList } from "~/components/hos-log/history-list";
+import { HosLogBackupPanel } from "~/components/hos-log/hos-log-backup-panel";
 import { buildHistoryItems } from "~/components/hos-log/history-items";
 import { HosStorageContext } from "~/components/hos-log/context/hos-storage-provider";
 import {
@@ -134,6 +135,7 @@ export default component$(() => {
           disabled={!historyReady.value || loading.value}
         />
       )}
+      {historyReady.value && !loading.value && <HosLogBackupPanel />}
     </div>
   );
 });

@@ -62,6 +62,26 @@ button to retry. If another tab changes a day after you opened it, saving is
 blocked to avoid overwriting the newer record; copy any unsaved edits, then
 reload the log and apply your changes again.
 
+### Import and export backups
+
+On **Log history**, use **Export backup** to download a plain-text file, or
+**Import backup** to restore one. Choose an inclusive **From** and **Through**
+date for export; leave either date blank for an open-ended range, or leave both
+blank to export all saved days. Each line contains only a compact raw log,
+including its `YYYYMMDD` date. For example:
+
+```text
+20261013O0630D0930O2400
+```
+
+Past days are treated as complete through 24:00. Today's log is considered
+closed only when its last entry ends at 24:00; otherwise its final status is
+ongoing. Backup files do not preserve the original closing or update time.
+Older backups with timestamp fields can still be imported. All rows are
+validated before any records are written. If dates already exist, the app
+lists the conflicts and recommends exporting a backup before you choose
+whether to replace them.
+
 The main view always shows today's log and duration breakdown. Use **View past
 logs** to open a historical day in a slide-over panel. Historical changes are
 saved with **Save changes** or abandoned with **Discard**; status quick-entry
