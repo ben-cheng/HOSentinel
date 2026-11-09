@@ -1,6 +1,10 @@
-import { staticAdapter } from "@qwik.dev/router/adapters/static/vite";
+import { viteAdapter } from "@qwik.dev/router/adapters/shared/vite";
 import { extendConfig } from "@qwik.dev/router/vite";
-import baseConfig from "../../vite.config.ts";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import baseConfig, { deploymentBase } from "../../vite.config.ts";
+
+const origin = "https://ben-cheng.github.io";
 
 export default extendConfig(baseConfig, () => {
   return {
@@ -11,8 +15,18 @@ export default extendConfig(baseConfig, () => {
       },
     },
     plugins: [
-      staticAdapter({
-        origin: "https://ben-cheng.github.io",
+      viteAdapter({
+        name: "static-site-generation",
+        origin,
+        ssg: { include: ["/*"], origin },
+        async generate({ clientPublicOutDir, basePathname }) {
+          // SSG uses the normalized router base in its sitemap URLs.
+          const sitemapPath = join(clientPublicOutDir, "sitemap.xml");
+          const sitemap = await readFile(sitemapPath, "utf8");
+          const routerPrefix = new URL(basePathname, origin).href;
+          const deploymentPrefix = new URL(deploymentBase, origin).href;
+          await writeFile(sitemapPath, sitemap.replaceAll(routerPrefix, deploymentPrefix));
+        },
       }),
     ],
   };

@@ -84,7 +84,9 @@ status is carried forward automatically; Off Duty (`O`) is used when there is
 no earlier saved log.
 
 The manifest and service worker are served from the configured `/HOSentinel/`
-base path. If that deployment path changes, update `base` in `vite.config.ts`.
+base path. If that deployment path changes, update `deploymentBase` in
+`vite.config.ts`. Qwik Router rc.3 requires a lowercase matching base; the
+static adapter restores the deployment path's original case in the sitemap.
 
 ## Preview
 

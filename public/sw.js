@@ -1,4 +1,4 @@
-const CACHE_NAME = "hosentinel-v4";
+const CACHE_NAME = "hosentinel-v5";
 const APP_SHELL_URL = new URL("./", self.registration.scope).href;
 const PRECACHE_URLS = [
   APP_SHELL_URL,
@@ -10,7 +10,6 @@ const PRECACHE_URLS = [
   new URL("app-icon-192.png", APP_SHELL_URL).href,
   new URL("app-icon-512.png", APP_SHELL_URL).href,
   new URL("q-manifest.json", APP_SHELL_URL).href,
-  new URL("q-data.json", APP_SHELL_URL).href,
 ];
 
 self.addEventListener("install", (event) => {

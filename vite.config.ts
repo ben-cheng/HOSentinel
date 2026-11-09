@@ -10,11 +10,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 const pkg = createRequire(import.meta.url)("./package.json");
 type PkgDep = Record<string, string>;
-// Keep route matching at `/` while Vite prefixes assets for GitHub Pages.
 type QwikRouterOptionsWithBaseUrl = Parameters<typeof qwikRouter>[0] & {
   baseUrl: string;
 };
-const qwikRouterOptions: QwikRouterOptionsWithBaseUrl = { baseUrl: "/" };
+export const deploymentBase = "/HOSentinel/";
 const { dependencies = {}, devDependencies = {} } = pkg as any as {
   dependencies: PkgDep;
   devDependencies: PkgDep;
@@ -26,11 +25,16 @@ errorOnDuplicatesPkgDeps(devDependencies, dependencies);
  * Note that Vite normally starts from `index.html` but the qwikCity plugin makes start at `src/entry.ssr.tsx` instead.
  */
 export default defineConfig(({ command, mode }): UserConfig => {
+  const base = command === "serve" && mode === "ssr" ? "/" : deploymentBase;
+  // Qwik Router rc.3 matches lowercase trie keys but does not lowercase base segments.
+  const routerOptions: QwikRouterOptionsWithBaseUrl = {
+    baseUrl: base.toLowerCase(),
+  };
   return {
-    base: command === "serve" && mode === "ssr" ? "/" : "/HOSentinel/",
+    base,
     plugins: [
       tailwindcss(),
-      qwikRouter(qwikRouterOptions),
+      qwikRouter(routerOptions),
       qwikVite(),
     ],
     resolve: {
