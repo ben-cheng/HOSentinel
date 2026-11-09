@@ -3,6 +3,7 @@
 /lib
 /lib-types
 /server
+/dummy-non-existing-folder
 
 # Development
 node_modules
