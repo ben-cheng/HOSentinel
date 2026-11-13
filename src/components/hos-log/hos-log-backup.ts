@@ -70,6 +70,10 @@ export function parseBackup(text: string, importedAt: string): HosLogRecord[] {
       const parsed = parseLogs(log, { now: importTime });
       if (dates.has(parsed.date))
         throw new Error(`Duplicate date ${parsed.date}.`);
+      const previous = records.at(-1);
+      if (previous && parsed.date < previous.date) {
+        throw new Error("Dates must be in ascending order (oldest first).");
+      }
       dates.add(parsed.date);
       const entries =
         parsed.date < today
@@ -103,7 +107,8 @@ export function parseBackup(text: string, importedAt: string): HosLogRecord[] {
 export function formatBackup(records: HosLogRecord[], now = new Date()): string {
   const today = getLocalDateKey(now);
   return (
-    records
+    [...records]
+      .sort((a, b) => a.date.localeCompare(b.date))
       .map((record) => {
         const parsed = parseLogs(record.logText, {
           date: record.date,

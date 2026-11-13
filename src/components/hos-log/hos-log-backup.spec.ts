@@ -42,6 +42,28 @@ describe("text backups", () => {
     }], now)).toBe("20261013D0930O2400\n");
   });
 
+  it("exports records oldest first without changing the input order", () => {
+    const newestFirst = [records[1], records[0]];
+    const backup = formatBackup(newestFirst, now);
+    expect(backup).toBe("20261013O0630D0930O2400\n20261014D1200O2400\n");
+    expect(newestFirst).toEqual([records[1], records[0]]);
+    expect(parseBackup(backup, importedAt).map((record) => record.date)).toEqual([
+      "2026-10-13",
+      "2026-10-14",
+    ]);
+  });
+
+  it("validates date order across blank lines and different date formats", () => {
+    expect(() =>
+      parseBackup("2026-10-14O\n\n20261013D", importedAt),
+    ).toThrow("Line 3: Dates must be in ascending order (oldest first).");
+    expect(
+      parseBackup("20261012O\n\n2026-10-13D", importedAt).map(
+        (record) => record.date,
+      ),
+    ).toEqual(["2026-10-12", "2026-10-13"]);
+  });
+
   it("imports past days through 24:00, preserving their final status", () => {
     const result = parseBackup("\uFEFF20261012O0630D\r\n20261013O\r\n", importedAt);
     expect(result.map((record) => record.logText)).toEqual([

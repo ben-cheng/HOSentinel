@@ -111,6 +111,7 @@ export const HosLogBackupPanel = component$(() => {
         </h3>
         <p class="mt-1 text-sm text-slate-600">
           Back up your logs as a text file or import a previous backup.
+          Dates must be ordered oldest first.
         </p>
       </div>
       <div>

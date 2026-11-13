@@ -68,7 +68,9 @@ On **Log history**, use **Export backup** to download a plain-text file, or
 **Import backup** to restore one. Choose an inclusive **From** and **Through**
 date for export; leave either date blank for an open-ended range, or leave both
 blank to export all saved days. Each line contains only a compact raw log,
-including its `YYYYMMDD` date. For example:
+including its `YYYYMMDD` date. Records are exported and must be imported in
+ascending date order (oldest first). Older backups in descending order must be
+reordered before import. For example:
 
 ```text
 20261013O0630D0930O2400
